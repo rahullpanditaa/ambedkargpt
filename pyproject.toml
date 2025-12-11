@@ -1,0 +1,10 @@
+[project]
+name = "ambedkargpt"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pdfminer-six>=20251107",
+    "pypdf>=6.4.1",
+]
