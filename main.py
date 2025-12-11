@@ -1,5 +1,8 @@
+from src.ingest.pdf_ingest import PDFIngestion
+
 def main():
-    print("Hello from ambedkargpt!")
+    pdf_ingestor = PDFIngestion()
+    pdf_ingestor._extract_paragraphs()
 
 
 if __name__ == "__main__":

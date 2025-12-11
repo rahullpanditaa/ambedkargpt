@@ -7,7 +7,9 @@ DATA_DIR_PATH = Path(__file__).parent.parent.parent.resolve() / "data"
 AMBEDKAR_BOOK_PATH =  DATA_DIR_PATH / "Ambedkar_book.pdf"
 RAW_BOOK_TEXT = extract_text(AMBEDKAR_BOOK_PATH)
 
-BOOK_PARAGRAPHS_PATH = DATA_DIR_PATH / "paragraphs.json"
+PROCESSED_DATA_DIR_PATH = DATA_DIR_PATH / "processed"
+
+BOOK_PARAGRAPHS_PATH = PROCESSED_DATA_DIR_PATH / "paragraphs.json"
 
 
 class PDFIngestion:
@@ -15,7 +17,7 @@ class PDFIngestion:
 
         # each str is an entire page's text
         self.pages: list[str] = pdf.split("\x0c")
-        # self.paragraphs: list[dict] = []
+        self.paragraphs: list[dict] = []
 
     # each page of text -> list of paragraphs
     def _extract_paragraphs(self) -> list[dict]:
@@ -56,8 +58,10 @@ class PDFIngestion:
                     "text": merged_text
                 })
         
+        PROCESSED_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
         with open(BOOK_PARAGRAPHS_PATH, "w") as f:
-            json.dump({"paragraphs": paragraphs}, BOOK_PARAGRAPHS_PATH, indent=2)
+            json.dump({"paragraphs": paragraphs}, f, indent=2)
+        self.paragraphs = paragraphs
         return paragraphs
 
 
