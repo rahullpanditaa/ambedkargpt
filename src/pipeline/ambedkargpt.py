@@ -11,7 +11,7 @@ def main():
 
     args = parser.parse_args()
 
-    match args.command:
+    match args.commands:
         case "buffer-merge":
             buffer_merge_command()
         case _:

@@ -56,7 +56,7 @@ def buffer_merge_command(b: int=B):
     print(f"First {len(merged_units)} merged units created:")
     for i, unit in enumerate(merged_units):
         print(f"{i}. {unit['text'][:50]}...")
-        print(f"Starting sentence: {unit['start']}, Ending sentence: {unit['last']}")
+        print(f"Starting sentence: {unit['start']}, Ending sentence: {unit['end']}")
         print()
 
 

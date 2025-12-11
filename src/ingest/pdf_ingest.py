@@ -3,15 +3,24 @@ import spacy
 from pathlib import Path
 from pdfminer.high_level import extract_text
 
-DATA_DIR_PATH = Path(__file__).parent.parent.parent.resolve() / "data"
+# DATA_DIR_PATH = Path(__file__).parent.parent.parent.resolve() / "data"
 
-AMBEDKAR_BOOK_PATH =  DATA_DIR_PATH / "Ambedkar_book.pdf"
-RAW_BOOK_TEXT = extract_text(AMBEDKAR_BOOK_PATH)
+# AMBEDKAR_BOOK_PATH =  DATA_DIR_PATH / "Ambedkar_book.pdf"
+# RAW_BOOK_TEXT = extract_text(AMBEDKAR_BOOK_PATH)
 
-PROCESSED_DATA_DIR_PATH = DATA_DIR_PATH / "processed"
+# PROCESSED_DATA_DIR_PATH = DATA_DIR_PATH / "processed"
 
-BOOK_PARAGRAPHS_PATH = PROCESSED_DATA_DIR_PATH / "paragraphs.json"
-BOOK_SENTENCES_PATH = PROCESSED_DATA_DIR_PATH / "sentences.json"
+# BOOK_PARAGRAPHS_PATH = PROCESSED_DATA_DIR_PATH / "paragraphs.json"
+# BOOK_SENTENCES_PATH = PROCESSED_DATA_DIR_PATH / "sentences.json"
+
+from src.utils.constants import (
+    DATA_DIR_PATH,
+    AMBEDKAR_BOOK_PATH,
+    RAW_BOOK_TEXT,
+    PROCESSED_DATA_DIR_PATH,
+    BOOK_PARAGRAPHS_PATH,
+    BOOK_SENTENCES_PATH
+)
 
 class PDFIngestion:
     def __init__(self, pdf=RAW_BOOK_TEXT):
