@@ -17,9 +17,15 @@ class PDFIngestion:
     def __init__(self, pdf=RAW_BOOK_TEXT):
 
         # each str is an entire page's text
-        self.pages: list[str] = pdf.split("\x0c")
+        self.pages: list[str] = [p for p in pdf.split("\x0c") if p.strip() != ""]
         self.paragraphs: list[dict] = []
         self.sentences = []
+
+    # @property
+    # def paragraphs(self) -> list[dict]:
+    #     if len(self._paragraphs) == 0:
+    #         self._extract_paragraphs()
+    #     return self._paragraphs
 
     # each page of text -> list of paragraphs
     def _extract_paragraphs(self) -> list[dict]:
@@ -50,7 +56,7 @@ class PDFIngestion:
                     continue
 
                 # non empty line - same para
-                current_paragraph_lines.append(line)
+                current_paragraph_lines.append(cleaned_line)
 
             if current_paragraph_lines:
                 merged_text = " ".join(current_paragraph_lines).strip()
@@ -67,31 +73,27 @@ class PDFIngestion:
         return paragraphs
     
     def _extract_sentences(self):
-        if self.paragraphs is None:
-            self._extract_paragraphs()
-
         sentences = []
         nlp = spacy.blank("en")
         nlp.add_pipe("sentencizer")
-        id = 1
+        global_id = 1
         for paragraph in self.paragraphs:
             doc = nlp(paragraph["text"])
             sentence_idx = 0
             for sentence in doc.sents:                
-                s = sentence.text.strip()
+                s = " ".join(sentence.text.strip().split())
                 if s == "":
                     continue
                 sentences.append({
-                    "id": f"sent_{id:05}",
+                    "id": f"sent_{global_id:06}",
                     "page": paragraph["page"],
                     "para_idx": paragraph["para_idx"],
                     # sentence index per paragraph
                     "sentence_idx": sentence_idx,
-                    "text": paragraph["text"]
+                    "text": s
                 })
-                id += 1
+                global_id += 1
                 sentence_idx += 1
-            sentence_idx = 0
 
         with open(BOOK_SENTENCES_PATH, "w") as f:
             json.dump({
