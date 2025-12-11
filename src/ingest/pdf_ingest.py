@@ -1,23 +1,21 @@
+import json
 from pathlib import Path
 from pdfminer.high_level import extract_text
 
 DATA_DIR_PATH = Path(__file__).parent.parent.parent.resolve() / "data"
-AMBEDKAR_BOOK_PATH =  DATA_DIR_PATH / "Ambedkar_book.pdf"
 
+AMBEDKAR_BOOK_PATH =  DATA_DIR_PATH / "Ambedkar_book.pdf"
 RAW_BOOK_TEXT = extract_text(AMBEDKAR_BOOK_PATH)
+
+BOOK_PARAGRAPHS_PATH = DATA_DIR_PATH / "paragraphs.json"
 
 
 class PDFIngestion:
     def __init__(self, pdf=RAW_BOOK_TEXT):
-        self.pdf_text = pdf
 
         # each str is an entire page's text
-        self.pages: list[str] = []
-
-    def _split_pdf_into_pages(self):
-        # split on form feed characters
-        pages = self.pdf_text.split("\x0c")
-        self.pages = pages
+        self.pages: list[str] = pdf.split("\x0c")
+        # self.paragraphs: list[dict] = []
 
     # each page of text -> list of paragraphs
     def _extract_paragraphs(self) -> list[dict]:
@@ -58,6 +56,10 @@ class PDFIngestion:
                     "text": merged_text
                 })
         
+        with open(BOOK_PARAGRAPHS_PATH, "w") as f:
+            json.dump({"paragraphs": paragraphs}, BOOK_PARAGRAPHS_PATH, indent=2)
         return paragraphs
 
 
+# def write_json(json_file_path: Path, object):
+    
