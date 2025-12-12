@@ -14,7 +14,7 @@ class MergedUnitsEmbedder:
         self.model = SentenceTransformer(model_name_or_path=model_name)
         self.segment_embeddings = None
 
-    def build_embeddings(self) -> np.ndarray:
+    def _build_embeddings(self) -> np.ndarray:
         all_units_str = []
         for unit in self.merged_units:
             all_units_str.append(unit["text"])
@@ -22,3 +22,16 @@ class MergedUnitsEmbedder:
         np.save(SEGMENTS_EMBEDDINGS_PATH, self.segment_embeddings)
         return self.segment_embeddings
     
+    def load_or_create_embeddings(self) -> np.ndarray:
+        if SEGMENTS_EMBEDDINGS_PATH.exists():
+            self.segment_embeddings = np.load(SEGMENTS_EMBEDDINGS_PATH)
+            if len(self.segment_embeddings) == len(self.merged_units):
+                return self.segment_embeddings
+        return self._build_embeddings()
+
+def embed_segments_command():
+    em = MergedUnitsEmbedder()
+    print("Generating vector embeddings for merged units (results of BufferMerge)...")
+    embeddings = em.load_or_create_embeddings()
+    print("Embeddings generated!!")
+    print(f"Embeddings of shape: {embeddings.shape[0]} vectors in {embeddings.shape[1]} dimensions")
