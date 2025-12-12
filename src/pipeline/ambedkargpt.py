@@ -2,6 +2,7 @@ import argparse
 
 from src.chunking.buffer_merger import buffer_merge_command
 from src.embeddings.embedder import embed_segments_command, compute_cosine_distances_command, inspect_distances_command
+from src.chunking.semantic_chunker import create_chunks_command
 
 def main():
     parser = argparse.ArgumentParser("Ambedkar-GPT")
@@ -15,6 +16,9 @@ def main():
     cosine_distance_parser = subparsers.add_parser("cosine-distances", help="Compute cosine distances between consecutive segment embeddings.")
     
     inspect_distances_parser = subparsers.add_parser("inspect-distances", help="Inspect calculated cosine distances")
+    
+    create_chunks_parser = subparsers.add_parser("create-chunks", help="Create chunks from source pdf")
+    create_chunks_parser.add_argument("--limit", type=int, help="Number of chunks to print", nargs='?', default=5)
     args = parser.parse_args()
 
     match args.commands:
@@ -26,6 +30,8 @@ def main():
             compute_cosine_distances_command()
         case "inspect-distances":
             inspect_distances_command()
+        case "create-chunks":
+            create_chunks_command(limit=args.limit)
         case _:
             parser.print_help()
 

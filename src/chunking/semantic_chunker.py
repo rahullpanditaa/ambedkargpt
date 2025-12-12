@@ -107,7 +107,7 @@ class SemanticChunking:
         chunk_id = 1
 
         for unit_indices in chunks:
-            chunk_obj = self._reconstruct_chunk_from_sentences(unit_indices)
+            chunk_obj = self._chunk_reconstruction_from_sentences(unit_indices)
 
             # if chunk is large -- split
             subchunks = self._split_large_chunk(chunk_obj)
@@ -118,11 +118,19 @@ class SemanticChunking:
                     "text": sc["text"],
                     "sentence_indices": sc["sentence_indices"],
                     "num_tokens": sc["num_tokens"],
-                    "source_units": unit_indices  # helpful for debugging
+                    "source_units": unit_indices 
                 })
                 chunk_id += 1
-                
+
         with open(CHUNKS_OUTPUT_PATH, "w") as f:
             json.dump({"chunks": final_chunks}, f, indent=2)
 
         return final_chunks
+    
+def create_chunks_command(limit: int=5):
+    sc = SemanticChunking()
+    print(f"Creating chunks from 'data/Ambedkar_book.pdf'...")
+    chunks = sc.create_chunks()
+    print(f"Printing first {limit} chunks...")
+    for i, ch in enumerate(chunks[:limit], 1):
+        print(f"{i}. ({ch['chunk_id']}) Text: {ch['text'][:100]}...")
