@@ -1,10 +1,11 @@
 import json
+import numpy as np
 
 from src.utils.constants import (
     BOOK_SENTENCES_PATH, B, BUFFER_MERGE_RESULTS_PATH
 )
 class BufferMerge:
-    def __init__(self):
+    def __init__(self, model):
         with open(BOOK_SENTENCES_PATH, "r") as f:
             sentences = json.load(f)
         self.sentences = sentences["sentences"]
@@ -47,6 +48,7 @@ class BufferMerge:
             json.dump({"buffer_merge_results": merged_units}, f, indent=2)
         # S hat in algorithm 1 in SemRAG paper
         return merged_units[:20]
+
             
 def buffer_merge_command(b: int=B):
     print("Performing BufferMerge on 'data/sentences.json'...")
