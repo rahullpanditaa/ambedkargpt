@@ -36,14 +36,14 @@ class MergedUnitsEmbedder:
         if self.segment_embeddings is None or len(self.segment_embeddings) == 0:
             raise ValueError("No segment embeddings loaded. Use 'embed-segments' command")
         
-        cosine_distances = []
+        cos_distances = []
         for i in range(len(self.segment_embeddings) - 1):
             d = 1 - _cosine_similarity(self.segment_embeddings[i],
                                        self.segment_embeddings[i+1])
             # Algorithm 1 steps 5,6
-            cosine_distances.append(d)
+            cos_distances.append(d)
         
-        np.save(SEGMENTS_DISTANCES_PATH, cosine_distances)
+        np.save(SEGMENTS_DISTANCES_PATH, np.array(cos_distances, dtype=np.float32))
 
         
 
@@ -53,6 +53,13 @@ def embed_segments_command():
     embeddings = em.load_or_create_embeddings()
     print("Embeddings generated!!")
     print(f"Embeddings of shape: {embeddings.shape[0]} vectors in {embeddings.shape[1]} dimensions")
+
+def compute_cosine_distances_command():
+    em = MergedUnitsEmbedder()
+    print("Computing cosine distances between consecutive segment embeddings...")
+    em.load_or_create_embeddings()
+    em.compute_cosine_distance()
+    print(f"- Distances computed. Saved to 'data/processed/{SEGMENTS_DISTANCES_PATH.name}'")
 
 def _cosine_similarity(vec1, vec2):
     dot_product = np.dot(vec1, vec2)
