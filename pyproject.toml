@@ -10,5 +10,6 @@ dependencies = [
     "sentence-transformers>=5.2.0",
     "setuptools>=80.9.0",
     "spacy>=3.8.11",
+    "transformers>=4.57.3",
     "wheel>=0.45.1",
 ]
