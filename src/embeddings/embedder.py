@@ -2,9 +2,11 @@ import json
 import numpy as np
 from src.utils.constants import (
     BUFFER_MERGE_RESULTS_PATH,
-    SEGMENTS_EMBEDDINGS_PATH
+    SEGMENTS_EMBEDDINGS_PATH,
+    SEGMENTS_DISTANCES_PATH
 )
 from sentence_transformers import SentenceTransformer
+# from sklearn.metrics.pairwise import cosine_distances
 
 class MergedUnitsEmbedder:
     def __init__(self, model_name="all-MiniLM-L6-v2"):
@@ -27,7 +29,23 @@ class MergedUnitsEmbedder:
             self.segment_embeddings = np.load(SEGMENTS_EMBEDDINGS_PATH)
             if len(self.segment_embeddings) == len(self.merged_units):
                 return self.segment_embeddings
+        # Algorithm 1 step 4
         return self._build_embeddings()
+    
+    def compute_cosine_distance(self):
+        if self.segment_embeddings is None or len(self.segment_embeddings) == 0:
+            raise ValueError("No segment embeddings loaded. Use 'embed-segments' command")
+        
+        cosine_distances = []
+        for i in range(len(self.segment_embeddings) - 1):
+            d = 1 - _cosine_similarity(self.segment_embeddings[i],
+                                       self.segment_embeddings[i+1])
+            # Algorithm 1 steps 5,6
+            cosine_distances.append(d)
+        
+        np.save(SEGMENTS_DISTANCES_PATH, cosine_distances)
+
+        
 
 def embed_segments_command():
     em = MergedUnitsEmbedder()
@@ -35,3 +53,13 @@ def embed_segments_command():
     embeddings = em.load_or_create_embeddings()
     print("Embeddings generated!!")
     print(f"Embeddings of shape: {embeddings.shape[0]} vectors in {embeddings.shape[1]} dimensions")
+
+def _cosine_similarity(vec1, vec2):
+    dot_product = np.dot(vec1, vec2)
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
+
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+    
+    return dot_product / (norm1 * norm2)
