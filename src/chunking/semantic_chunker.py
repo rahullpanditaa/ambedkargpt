@@ -23,19 +23,29 @@ class SemanticChunking:
 
         self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
-    def create_chunks(self):
-        current_chunk = ""
-        current_chunk += self.merged_units[0]["text"]
-        
-        chunks = []
-        for i, unit in enumerate(self.merged_units, 1):
-            if self.segment_distances[i] < THETA:
-                current_chunk += unit["text"]
-            else:
-                chunks.append({
-                    "id": i,
-                    "chunk": current_chunk
-                })
-                current_chunk = unit["text"]
-        
-        return chunks
+    def _chunk_reconstruction_from_sentences(self, chunk_unit_indices: list[int]) -> dict:
+        # convert merged-units into final chunk text
+        all_sentences_indices = []
+
+        for unit_index in chunk_unit_indices:
+            unit = self.merged_units[unit_index]
+            start = unit["start"]
+            end = unit["end"]
+            all_sentences_indices.extend(range(start, end+1))
+
+        seen = set()
+        ordered_sentences_idxs = []
+        for idx in all_sentences_indices:
+            if idx not in seen:
+                seen.add(idx)
+                ordered_sentences_idxs.append(idx)
+
+        final_text = " ".join(self.sentences[i]["text"] for i in ordered_sentences_idxs)
+
+        num_of_tokens = len(self.tokenizer.encode(final_text))
+
+        return {
+            "sentence_indices": ordered_sentences_idxs,
+            "text": final_text,
+            "num_tokens": num_of_tokens
+        }
