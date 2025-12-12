@@ -6,7 +6,6 @@ from src.utils.constants import (
     SEGMENTS_DISTANCES_PATH
 )
 from sentence_transformers import SentenceTransformer
-# from sklearn.metrics.pairwise import cosine_distances
 
 class MergedUnitsEmbedder:
     def __init__(self, model_name="all-MiniLM-L6-v2"):
@@ -35,6 +34,9 @@ class MergedUnitsEmbedder:
     def compute_cosine_distance(self):
         if self.segment_embeddings is None or len(self.segment_embeddings) == 0:
             raise ValueError("No segment embeddings loaded. Use 'embed-segments' command")
+        if SEGMENTS_DISTANCES_PATH.exists():
+            print(f"Cosine distances already calculated. File at '{SEGMENTS_DISTANCES_PATH.name}'")
+            return
         
         cos_distances = []
         for i in range(len(self.segment_embeddings) - 1):
@@ -42,9 +44,17 @@ class MergedUnitsEmbedder:
                                        self.segment_embeddings[i+1])
             # Algorithm 1 steps 5,6
             cos_distances.append(d)
-        
-        np.save(SEGMENTS_DISTANCES_PATH, np.array(cos_distances, dtype=np.float32))
 
+        numpy_arr = np.array(cos_distances, dtype=np.float32)
+        np.save(SEGMENTS_DISTANCES_PATH, numpy_arr)
+
+    def distances_inspection(self):
+        distances = np.load(SEGMENTS_DISTANCES_PATH)
+        print("Inspecting calculated cosine distances:")
+        print(f"- Mean: {np.mean(distances):.4f}")
+        print(f"- Standard deviation: {np.std(distances):.4f}")
+        print(f"- Maximum distance: {np.amax(distances):.4f}")
+        print(f"- Minimum distance: {np.amin(distances):.4f}")
         
 
 def embed_segments_command():
@@ -60,6 +70,11 @@ def compute_cosine_distances_command():
     em.load_or_create_embeddings()
     em.compute_cosine_distance()
     print(f"- Distances computed. Saved to 'data/processed/{SEGMENTS_DISTANCES_PATH.name}'")
+
+def inspect_distances_command():
+    em = MergedUnitsEmbedder()
+    em.load_or_create_embeddings()
+    em.distances_inspection()
 
 def _cosine_similarity(vec1, vec2):
     dot_product = np.dot(vec1, vec2)
