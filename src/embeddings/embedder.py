@@ -2,7 +2,7 @@ import json
 import numpy as np
 from src.utils.constants import (
     BUFFER_MERGE_RESULTS_PATH,
-    SEGMENT_EMBEDDINGS_PATH
+    SEGMENTS_EMBEDDINGS_PATH
 )
 from sentence_transformers import SentenceTransformer
 
@@ -14,10 +14,11 @@ class MergedUnitsEmbedder:
         self.model = SentenceTransformer(model_name_or_path=model_name)
         self.segment_embeddings = None
 
-    def build_embeddings(self):
+    def build_embeddings(self) -> np.ndarray:
         all_units_str = []
         for unit in self.merged_units:
             all_units_str.append(unit["text"])
         self.segment_embeddings = self.model.encode(all_units_str, show_progress_bar=True)
-        np.save(SEGMENT_EMBEDDINGS_PATH, self.segment_embeddings)
+        np.save(SEGMENTS_EMBEDDINGS_PATH, self.segment_embeddings)
         return self.segment_embeddings
+    

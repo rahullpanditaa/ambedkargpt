@@ -14,4 +14,5 @@ B = 2  #buffer size
 
 # Merged units
 BUFFER_MERGE_RESULTS_PATH = PROCESSED_DATA_DIR_PATH / "buffer_merge.json"
-SEGMENT_EMBEDDINGS_PATH = PROCESSED_DATA_DIR_PATH / "segment_embeddings.npy"
+SEGMENTS_EMBEDDINGS_PATH = PROCESSED_DATA_DIR_PATH / "segment_embeddings.npy"
+SEGMENTS_METADATA_PATH = PROCESSED_DATA_DIR_PATH / "segments_metadata.json"
