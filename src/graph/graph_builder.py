@@ -20,6 +20,7 @@ class GraphBuilder:
                            "weight": rel["weight"]}
                            for rel in relations]
         self.graph = nx.Graph()
+        self._graph_built = False
 
     def build_graph(self):
         for rel in self.relations:
@@ -29,14 +30,20 @@ class GraphBuilder:
             # if no - create it, weight = 1
             # if yes - weight ++
             if self.graph.has_edge(src, trgt):
-                self.graph.edges[(src, trgt)]["weight"] += 1
+                self.graph.edges[(src, trgt)]["weight"] += rel["weight"]
             else:
-                self.graph.add_edge(src, trgt, weight=1)
+                self.graph.add_edge(src, trgt, weight=rel["weight"])
+        self._graph_built = True
+        print("Graph built")
+        print(f"- Number of nodes: {self.graph.number_of_nodes()}")
+        print(f"- Number of edges: {self.graph.number_of_edges()}")
+
 
     def save_graph(self):
-        if len(list(self.graph.edges)) == 0:
+        if not self._graph_built:
             self.build_graph()
+            self._graph_built = True
 
         PROCESSED_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
-        with open(PROCESSED_DATA_DIR_PATH, "wb") as f:
+        with open(KNOWLEDGE_GRAPH_PATH, "wb") as f:
             pickle.dump(self.graph, f)
