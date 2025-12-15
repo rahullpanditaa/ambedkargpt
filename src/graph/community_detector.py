@@ -7,7 +7,7 @@ import igraph as ig
 DATA_DIR_PATH = Path(__file__).parent.parent.parent.resolve() / "data"
 PROCESSED_DATA_DIR_PATH = DATA_DIR_PATH / "processed"
 KNOWLEDGE_GRAPH_PATH = PROCESSED_DATA_DIR_PATH / "knowledge_graph.pkl"
-
+ENTITY_COMMUNITY_PATH = PROCESSED_DATA_DIR_PATH / "entity_communities.json"
 
 class CommunityDetector:
     def __init__(self):
@@ -17,6 +17,7 @@ class CommunityDetector:
         self.graph_for_leiden = None
         self.entity_to_index_map = {}
         self.index_to_entity_map = {}
+        self.edge_weights = []
 
     def _map_entities_to_integers(self) -> dict:
         for id, node in enumerate(list(self.old_format_graph.nodes)):
@@ -59,6 +60,7 @@ class CommunityDetector:
             new_graph_edges.append((src_idx, trgt_idx))
             new_graph_weights.append(weight)
 
+        self.edge_weights = new_graph_weights
         return {
             "edges": new_graph_edges,
             "weights": new_graph_weights,
@@ -72,8 +74,19 @@ class CommunityDetector:
         weights = new_graph_data["weights"]
         self.graph_for_leiden = ig.Graph(n=n, edges=edges, edge_attrs={"weight": weights})
 
+    def run_leiden(self):
+        if not self.graph_for_leiden:
+            self.build_graph()
 
+        leiden = self.graph_for_leiden.community_leiden(weights=self.edge_weights)
+        mem_vector = leiden.membership
 
-    
+        entity_to_community_map = {}
+        for i, community_id in enumerate(mem_vector):
+            entity = self.index_to_entity_map[i]
+            entity_to_community_map[entity] = community_id
+
+        with open(ENTITY_COMMUNITY_PATH, "w") as f:
+            json.dump({"entity_communities": entity_to_community_map}, f,)
 
         
