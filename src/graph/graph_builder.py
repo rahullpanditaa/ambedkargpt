@@ -37,7 +37,7 @@ class GraphBuilder:
         print("Graph built")
         print(f"- Number of nodes: {self.graph.number_of_nodes()}")
         print(f"- Number of edges: {self.graph.number_of_edges()}")
-
+        return self.graph
 
     def save_graph(self):
         if not self._graph_built:
@@ -47,3 +47,7 @@ class GraphBuilder:
         PROCESSED_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
         with open(KNOWLEDGE_GRAPH_PATH, "wb") as f:
             pickle.dump(self.graph, f)
+
+def build_graph_command():
+    gb = GraphBuilder()
+    gb.save_graph()

@@ -1,10 +1,11 @@
 import argparse
 
-from src.chunking.buffer_merger import buffer_merge_command
-from src.embeddings.embedder import embed_segments_command, compute_cosine_distances_command, inspect_distances_command
-from src.chunking.semantic_chunker import create_chunks_command
-from src.graph.entity_extractor import extract_entities_command
-from src.graph.relationship_extractor import entity_relations_command
+# from src.chunking.buffer_merger import buffer_merge_command
+# from src.embeddings.embedder import embed_segments_command, compute_cosine_distances_command, inspect_distances_command
+# from src.chunking.semantic_chunker import create_chunks_command
+# from src.graph.entity_extractor import extract_entities_command
+# from src.graph.relationship_extractor import entity_relations_command
+from src.graph.graph_builder import build_graph_command
 
 def main():
     parser = argparse.ArgumentParser("Ambedkar-GPT")
@@ -23,12 +24,12 @@ def main():
     # create_chunks_parser.add_argument("--limit", type=int, help="Number of chunks to print", nargs='?', default=5)
     
     # extract_entities_parser = subparsers.add_parser("extract-entities", help="Extract entities from chunks")
-    subparsers.add_parser("entity-relations", help="Entity relations")
+    # subparsers.add_parser("entity-relations", help="Entity relations")
+    
+    graph_builder_parser = subparsers.add_parser("build-graph", help="Build knowledge graph")
     args = parser.parse_args()
 
     match args.commands:
-        case "entity-relations":
-            entity_relations_command()
         # case "buffer-merge":
         #     buffer_merge_command()
         # case "embed-segments":
@@ -41,6 +42,10 @@ def main():
         #     create_chunks_command(limit=args.limit)
         # case "extract-entities":
         #     extract_entities_command()
+        # case "entity-relations":
+        #     entity_relations_command()
+        case "build-graph":
+            build_graph_command()
         case _:
             parser.print_help()
 
