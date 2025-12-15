@@ -5,7 +5,7 @@ from itertools import combinations
 DATA_DIR_PATH = Path(__file__).parent.parent.parent.resolve() / "data"
 PROCESSED_DATA_DIR_PATH = DATA_DIR_PATH / "processed"
 CHUNK_ENTITIES_PATH = PROCESSED_DATA_DIR_PATH / "chunk_entities.json"
-
+ENTITY_RELATIONS_PATH = PROCESSED_DATA_DIR_PATH / "entity_relations.json"
 
 class RelationshipExtractor:
     def __init__(self):
@@ -15,7 +15,7 @@ class RelationshipExtractor:
         
         self.chunk_entities = list(filter(lambda d: len(d["entities"]) >= 2, entitites))
         
-    def extract_relations(self):
+    def extract_relationships(self):
         edges = []
 
         for ch in self.chunk_entities:
@@ -36,3 +36,10 @@ class RelationshipExtractor:
                     "weight": 1
                 })
         return edges
+    
+    def save_relationships(self):
+        edges = self.extract_relationships()
+
+        PROCESSED_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
+        with open(ENTITY_RELATIONS_PATH, "w") as f:
+            json.dump({"edges": edges}, f, indent=2)
