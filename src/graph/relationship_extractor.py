@@ -43,3 +43,9 @@ class RelationshipExtractor:
         PROCESSED_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
         with open(ENTITY_RELATIONS_PATH, "w") as f:
             json.dump({"edges": edges}, f, indent=2)
+
+
+def entity_relations_command():
+    re = RelationshipExtractor()
+    re.save_relationships()
+    print("Entity relations saved to disk")
