@@ -90,3 +90,7 @@ class CommunityDetector:
             json.dump({"entity_communities": entity_to_community_map}, f,)
 
         
+def run_leiden_command():
+    cd = CommunityDetector()
+    cd.run_leiden()
+    print("Ran Leiden algorithm successfully.")

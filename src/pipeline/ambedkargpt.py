@@ -5,7 +5,8 @@ import argparse
 # from src.chunking.semantic_chunker import create_chunks_command
 # from src.graph.entity_extractor import extract_entities_command
 # from src.graph.relationship_extractor import entity_relations_command
-from src.graph.graph_builder import build_graph_command
+# from src.graph.graph_builder import build_graph_command
+from src.graph.community_detector import run_leiden_command
 
 def main():
     parser = argparse.ArgumentParser("Ambedkar-GPT")
@@ -26,7 +27,9 @@ def main():
     # extract_entities_parser = subparsers.add_parser("extract-entities", help="Extract entities from chunks")
     # subparsers.add_parser("entity-relations", help="Entity relations")
     
-    graph_builder_parser = subparsers.add_parser("build-graph", help="Build knowledge graph")
+    # graph_builder_parser = subparsers.add_parser("build-graph", help="Build knowledge graph")
+    
+    run_leiden_parser = subparsers.add_parser("run-leiden", help="Run Leiden algorithm")
     args = parser.parse_args()
 
     match args.commands:
@@ -44,8 +47,10 @@ def main():
         #     extract_entities_command()
         # case "entity-relations":
         #     entity_relations_command()
-        case "build-graph":
-            build_graph_command()
+        # case "build-graph":
+        #     build_graph_command()
+        case "run-leiden":
+            run_leiden_command()
         case _:
             parser.print_help()
 
