@@ -14,10 +14,11 @@ class CommunityDetector:
         PROCESSED_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
         with open(KNOWLEDGE_GRAPH_PATH, "rb") as f:
             self.old_format_graph: nx.Graph = pickle.load(f)
-        self.graph_for_leiden = ig.Graph()
+        self.graph_for_leiden = None
+        self.entity_to_index_map = {}
+        self.index_to_entity_map = {}
 
     def _map_entities_to_integers(self) -> dict:
-        ent_idx_map = {}
         for id, node in enumerate(list(self.old_format_graph.nodes)):
             # ent_idx_map.append({
             #     "entity": node,
@@ -27,37 +28,50 @@ class CommunityDetector:
             #     node: id,
             #     id: node
             # })
-            ent_idx_map[node] = id
-            ent_idx_map[id] = node
+            # ent_idx_map[node] = id
+            # ent_idx_map[id] = node
+            self.entity_to_index_map[node] = id
+            self.index_to_entity_map[id] = node
 
-        return ent_idx_map
+        # return ent_idx_map
     
     def _convert_graph_edges_format(self):
-        entities_to_index_map = self._map_entities_to_integers()
+        if not self.entity_to_index_map or not self.index_to_entity_map:
+            self._map_entities_to_integers()
+            
         new_graph_data = []
-        new_graph_edges_weights = []
-        seen_entities = set()
+        new_graph_edges = []
+        new_graph_weights = []
+        # seen_entities = set()
         for edge in self.old_format_graph.edges.data("weight"):
             src_ent = edge[0]
             trgt_ent = edge[1]
-            seen_entities.add(src_ent)
-            seen_entities.add(trgt_ent)
+            # seen_entities.add(src_ent)
+            # seen_entities.add(trgt_ent)
             weight = edge[2]
-            src_idx = entities_to_index_map[src_ent]
-            trgt_idx = entities_to_index_map[trgt_ent]
+            src_idx = self.entity_to_index_map[src_ent]
+            trgt_idx = self.entity_to_index_map[trgt_ent]
             new_graph_data.append({
                 "source_index": src_idx,
                 "target_index": trgt_idx,
                 "weight": weight
             })
-            new_graph_edges_weights.append((src_idx, trgt_idx, weight))
+            new_graph_edges.append((src_idx, trgt_idx))
+            new_graph_weights.append(weight)
 
         return {
-            "edges": new_graph_edges_weights,
-            "number_of_vertices": len(seen_entities)
+            "edges": new_graph_edges,
+            "weights": new_graph_weights,
+            "number_of_vertices": len(self.old_format_graph.nodes)
         }
     
-    # def build_graph(self):
+    def build_graph(self):
+        new_graph_data = self._convert_graph_edges_format()
+        n = new_graph_data["number_of_vertices"]
+        edges = new_graph_data["edges"]
+        weights = new_graph_data["weights"]
+        self.graph_for_leiden = ig.Graph(n=n, edges=edges, edge_attrs={"weight": weights})
+
 
 
     
