@@ -61,3 +61,8 @@ class EntityExtractor:
         with open(CHUNK_ENTITIES_PATH, "w") as f:
             json.dump({"chunk_entities": entities}, f, indent=2)
         
+
+def extract_entities_command():
+    ee = EntityExtractor()
+    ee.create_chunk_entities()
+    print("Extracted entities")
