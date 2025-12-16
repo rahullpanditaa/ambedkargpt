@@ -11,6 +11,8 @@ CHUNKS_OUTPUT_PATH = PROCESSED_DATA_DIR_PATH / "chunks.json"
 CHUNK_ENTITIES_PATH = PROCESSED_DATA_DIR_PATH / "chunk_entities.json"
 COMMUNITY_SUMMARIES_PATH = PROCESSED_DATA_DIR_PATH / "community_summaries.json"
 
+# MIN_CHUNKS
+
 class CommunitySummarizer:
     def __init__(self):
         PROCESSED_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
@@ -23,6 +25,14 @@ class CommunitySummarizer:
             if comm_id not in self.comm_id_to_entities_map.keys():
                 self.comm_id_to_entities_map[comm_id] = []
             self.comm_id_to_entities_map[comm_id].append(entity)
+        
+        # filter such that only have communities with at least 5 entities
+        filtered_comm_id_to_ents_map = {}
+        for com_id, entities in self.comm_id_to_entities_map.items():
+            if len(entities) >= 5:
+                filtered_comm_id_to_ents_map[com_id] = entities
+        self.comm_id_to_entities_map = filtered_comm_id_to_ents_map
+
 
     def _collect_chunks_per_community(self):
         ch_ents = load_json(CHUNK_ENTITIES_PATH)
@@ -38,7 +48,8 @@ class CommunitySummarizer:
             for entity in chunk["entities"]:
                 if entity["text_norm"] in self.entity_to_comm_id_map:
                     chunk_community_id = self.entity_to_comm_id_map[entity["text_norm"]]
-                    current_chunk_in_communities.add(chunk_community_id)
+                    if chunk_community_id in self.comm_id_to_entities_map:
+                        current_chunk_in_communities.add(chunk_community_id)
                     
             for community_id in current_chunk_in_communities:
                 if community_id not in community_id_to_chunks:
@@ -120,7 +131,9 @@ class CommunitySummarizer:
 
             selected_chunks_per_community[community_id] = selected_chunks
 
-        return selected_chunks_per_community
+        # sort by chunk count
+        sorted_results = sorted(selected_chunks_per_community.items(), key=lambda i: len(i[1]))
+        return sorted_results
     
     def summarize_communities(self):
         llm_prompt = """You are an expert academic assistant.
@@ -147,8 +160,12 @@ Write the summary below:
 """
         selected_chunks_per_community = self.select_representative_chunks()
         summaries = []
-        for community_id, selected_chunks in selected_chunks_per_community.items():
+        MAX_COMMUNITIES = 40
+        for community_id, selected_chunks in selected_chunks_per_community[:MAX_COMMUNITIES]:
             if not selected_chunks:
+                continue
+            # adding minimum filter to reduce number of communities
+            if len(selected_chunks) < 3:
                 continue
             chunk_texts = []
             for chunk in selected_chunks:
