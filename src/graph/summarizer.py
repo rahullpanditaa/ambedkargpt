@@ -14,7 +14,7 @@ COMMUNITY_SUMMARIES_PATH = PROCESSED_DATA_DIR_PATH / "community_summaries.json"
 class CommunitySummarizer:
     def __init__(self):
         PROCESSED_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
-        with open(PROCESSED_DATA_DIR_PATH, "r") as f:
+        with open(ENTITY_COMMUNITY_PATH, "r") as f:
             entity_communities = json.load(f)
         self.entity_to_comm_id_map: dict = entity_communities["entity_communities"]
         self.comm_id_to_entities_map: dict = {}
