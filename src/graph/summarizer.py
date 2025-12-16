@@ -1,6 +1,7 @@
 
 import json
 from pathlib import Path
+import ollama
 
 DATA_DIR_PATH = Path(__file__).parent.parent.parent.resolve() / "data"
 PROCESSED_DATA_DIR_PATH = DATA_DIR_PATH / "processed"
@@ -8,6 +9,7 @@ PROCESSED_DATA_DIR_PATH = DATA_DIR_PATH / "processed"
 ENTITY_COMMUNITY_PATH = PROCESSED_DATA_DIR_PATH / "entity_communities.json"
 CHUNKS_OUTPUT_PATH = PROCESSED_DATA_DIR_PATH / "chunks.json"
 CHUNK_ENTITIES_PATH = PROCESSED_DATA_DIR_PATH / "chunk_entities.json"
+COMMUNITY_SUMMARIES_PATH = PROCESSED_DATA_DIR_PATH / "community_summaries.json"
 
 class CommunitySummarizer:
     def __init__(self):
@@ -119,9 +121,48 @@ class CommunitySummarizer:
             selected_chunks_per_community[community_id] = selected_chunks
 
         return selected_chunks_per_community
+    
+    def summarize_communities(self):
+        llm_prompt = """You are an expert academic assistant.
 
+You are given a collection of text passages extracted from the same thematic community in Dr. B. R. Ambedkar’s writings.  
+All passages are related and discuss closely connected ideas.
 
+Your task is to write a concise, factual, and coherent summary of the main themes, arguments, and concepts present in these passages.
 
+Guidelines:
+- Base the summary strictly on the provided text.
+- Do NOT introduce new information, interpretations, or external knowledge.
+- Do NOT speculate or generalize beyond what is stated.
+- Maintain a neutral, academic tone.
+- Focus on explaining what the passages collectively discuss, not on listing passages.
+- The summary should be 1–3 paragraphs long.
+
+Text passages:
+----------------
+{CHUNKS_TEXT}
+----------------
+
+Write the summary below:
+"""
+        selected_chunks_per_community = self.select_representative_chunks()
+        summaries = []
+        for community_id, selected_chunks in selected_chunks_per_community.items():
+            chunk_texts = []
+            for chunk in selected_chunks:
+                chunk_texts.append(chunk["text"])
+            llm_input_chunks_text = "\n".join(chunk_texts)
+            prompt = llm_prompt.replace("{CHUNKS_TEXT}", llm_input_chunks_text)
+            response = ollama.generate(model="mistral", prompt=prompt)
+            output = response.response
+            summaries.append({
+                "community_id": community_id,
+                "summary": output
+            })
+
+        with open(COMMUNITY_SUMMARIES_PATH, "w") as f:
+            json.dump(summaries, f, indent=2)
+        return summaries
 
 def load_json(file_path: Path):
     with open(file_path, "r") as f:
