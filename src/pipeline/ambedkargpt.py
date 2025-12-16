@@ -6,7 +6,8 @@ import argparse
 # from src.graph.entity_extractor import extract_entities_command
 # from src.graph.relationship_extractor import entity_relations_command
 # from src.graph.graph_builder import build_graph_command
-from src.graph.community_detector import run_leiden_command
+# from src.graph.community_detector import run_leiden_command
+from src.graph.summarizer import summarize_communities_command
 
 def main():
     parser = argparse.ArgumentParser("Ambedkar-GPT")
@@ -29,7 +30,9 @@ def main():
     
     # graph_builder_parser = subparsers.add_parser("build-graph", help="Build knowledge graph")
     
-    run_leiden_parser = subparsers.add_parser("run-leiden", help="Run Leiden algorithm")
+    # run_leiden_parser = subparsers.add_parser("run-leiden", help="Run Leiden algorithm")
+    
+    summarizer_command = subparsers.add_parser("summarize-communities", help="Generate LLM summaries for all communities")
     args = parser.parse_args()
 
     match args.commands:
@@ -49,8 +52,11 @@ def main():
         #     entity_relations_command()
         # case "build-graph":
         #     build_graph_command()
-        case "run-leiden":
-            run_leiden_command()
+        # case "run-leiden":
+        #     run_leiden_command()
+        case "summarize-communities":
+            summarize_communities_command()
+
         case _:
             parser.print_help()
 

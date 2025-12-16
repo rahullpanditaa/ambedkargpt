@@ -148,21 +148,35 @@ Write the summary below:
         selected_chunks_per_community = self.select_representative_chunks()
         summaries = []
         for community_id, selected_chunks in selected_chunks_per_community.items():
+            if not selected_chunks:
+                continue
             chunk_texts = []
             for chunk in selected_chunks:
                 chunk_texts.append(chunk["text"])
-            llm_input_chunks_text = "\n".join(chunk_texts)
+            llm_input_chunks_text = "\n\n---\n\n".join(chunk_texts)
             prompt = llm_prompt.replace("{CHUNKS_TEXT}", llm_input_chunks_text)
             response = ollama.generate(model="mistral", prompt=prompt)
             output = response.response
+            if not output:
+                continue
             summaries.append({
                 "community_id": community_id,
                 "summary": output
             })
+            print(f"Community {community_id} summary:")
+            print(f" - {output[:100]}...\n")
 
         with open(COMMUNITY_SUMMARIES_PATH, "w") as f:
             json.dump(summaries, f, indent=2)
         return summaries
+
+def summarize_communities_command():
+    cs = CommunitySummarizer()
+    print("Generating summaries for all communities...")
+    cs.summarize_communities()
+    print("Summaries generated, stored to disk")
+    
+
 
 def load_json(file_path: Path):
     with open(file_path, "r") as f:
