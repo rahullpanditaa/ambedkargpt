@@ -14,10 +14,9 @@ Query → Retrieval → Prompt → LLM Answer
 """
 
 import json
-from pathlib import Path
 import ollama
+from pathlib import Path
 
-from src.retrieval.global_search import GlobalGraphRAG
 from src.utils.constants import (
     PROCESSED_DATA_DIR_PATH,
     FINAL_ANSWER_PATH,
@@ -27,110 +26,99 @@ from src.utils.constants import (
 
 class SemRAGAnswerGenerator:
     """
-    End-to-end SemRAG answer generator.
+    Final answer generator for SemRAG.
 
-    This class orchestrates:
-    - Global Graph RAG retrieval
-    - Prompt construction
-    - LLM-based answer generation
+    This class:
+    - Accepts retrieved communities (global context)
+    - Accepts retrieved chunks (local evidence)
+    - Builds a grounded prompt
+    - Invokes a local LLM via Ollama
 
-    It represents the final online stage of the SemRAG system.
+    IMPORTANT:
+    This class does NOT perform retrieval.
+    Retrieval is orchestrated externally (Option B).
     """
 
-    def __init__(self, llm_model: str = "mistral", model_name: str = "all-MiniLM-L6-v2"):
+    def __init__(self, llm_model: str = "mistral"):
         """
         Initialize the answer generator.
 
         Args:
             llm_model (str): Ollama model name
-                             (e.g., mistral, llama3:8b)
-            embedding_model (str): SentenceTransformer model
+                             (e.g. mistral, llama3:8b)
         """
-
         self.llm_model = llm_model
-        self.global_rag = GlobalGraphRAG(model_name=model_name)
-
         PROCESSED_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
 
-    def _build_prompt(self, user_query: str, retrieved_items: list[dict]) -> str:
+    def _build_prompt(self, user_query: str, communities: list[dict], chunks: list[dict]) -> str:
         """
-        Construct an LLM prompt using retrieved communities and chunks.
+        Construct a grounded LLM prompt.
 
-        The prompt is explicitly grounded:
-        - No external knowledge allowed
-        - The LLM must rely only on retrieved evidence
+        Communities provide high-level semantic context.
+        Chunks provide concrete, quotable evidence.
 
         Args:
             user_query (str): User question
-            retrieved_items (list[dict]): Output from GlobalGraphRAG
+            communities (list[dict]): Global search results
+            chunks (list[dict]): Local search results
 
         Returns:
             str: Fully formatted prompt
         """
+        community_lines = []
+        for comm in communities:
+            community_lines.append(
+                f"- Community {comm['community_id']}: {comm['summary']}"
+            )
 
-        # unique community summaries
-        seen_communities = set()
-        community_summaries = []
+        community_block = "\n".join(community_lines)
 
-        for item in retrieved_items:
-            cid = item["community_id"]
-            if cid not in seen_communities:
-                seen_communities.add(cid)
-                community_summaries.append(
-                    f"- Community {cid}: {item.get('summary', '')}"
-                )
+        chunk_texts = [
+            ch["chunk_text"] for ch in chunks
+            if "chunk_text" in ch
+        ]
 
-        # chunk texts
-        chunk_texts = []
-        for item in retrieved_items:
-            chunk_texts.append(item["chunk_text"])
-
-        community_block = "\n".join(community_summaries)
         chunks_block = "\n\n---\n\n".join(chunk_texts)
 
-        prompt = ANSWER_GENERATOR_PROMPT.replace("{USER_QUERY}", user_query)
+        prompt = ANSWER_GENERATOR_PROMPT
+        prompt = prompt.replace("{USER_QUERY}", user_query)
         prompt = prompt.replace("{COMMUNITY_BLOCK}", community_block)
         prompt = prompt.replace("{CHUNKS_BLOCK}", chunks_block)
 
         return prompt
 
-    def generate_answer(self, user_query: str) -> dict:
+    def generate_answer(self, query: str, communities: list[dict], chunks: list[dict]) -> dict:
         """
-        Generate a final answer for a user query using SemRAG.
-
-        Pipeline:
-        1. Run Global Graph RAG
-        2. Build grounded prompt
-        3. Invoke local LLM via Ollama
-        4. Save and return answer
+        Generate a final answer using SemRAG.
 
         Args:
-            user_query (str): User question
+            query (str): User question
+            communities (list[dict]): Global search output
+            chunks (list[dict]): Local search output
 
         Returns:
-            dict: Answer object containing:
-                - query
-                - answer
-                - retrieved evidence
+            dict: {
+                "query": str,
+                "answer": str,
+                "communities": list,
+                "chunks": list
+            }
         """
 
-        # retrieval (eq 5 -> eq 4)
-        retrieved_items = self.global_rag.global_search(user_query)
-
-        if not retrieved_items:
+        if not chunks:
             return {
-                "query": user_query,
-                "answer": "No relevant information was found.",
-                "evidence": []
+                "query": query,
+                "answer": "No relevant information was found in the document.",
+                "communities": communities,
+                "chunks": []
             }
 
-        # build prompt
         prompt = self._build_prompt(
-            user_query=user_query,
-            retrieved_items=retrieved_items
+            user_query=query,
+            communities=communities,
+            chunks=chunks
         )
 
-        # call llm
         response = ollama.generate(
             model=self.llm_model,
             prompt=prompt
@@ -139,30 +127,13 @@ class SemRAGAnswerGenerator:
         answer_text = response.response.strip()
 
         output = {
-            "query": user_query,
+            "query": query,
             "answer": answer_text,
-            "evidence": retrieved_items
+            "communities": communities,
+            "chunks": chunks
         }
 
         with open(FINAL_ANSWER_PATH, "w") as f:
             json.dump(output, f, indent=2)
 
         return output
-
-
-def answer_query_command(query: str):
-    """
-    CLI-style helper for answering a single query.
-
-    Args:
-        query (str): User question
-    """
-
-    generator = SemRAGAnswerGenerator()
-    result = generator.generate_answer(query)
-
-    print("\n=== QUERY ===")
-    print(result["query"])
-
-    print("\n=== ANSWER ===")
-    print(result["answer"])

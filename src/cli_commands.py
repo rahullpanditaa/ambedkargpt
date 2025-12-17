@@ -98,9 +98,33 @@ def global_search_command(query: str):
 def answer_command(query: str):
     """
     Run full SemRAG pipeline and generate final answer.
+
+    Pipeline:
+    1. Global search (community-level retrieval)
+    2. Local search (chunk-level retrieval)
+    3. LLM answer generation
     """
+
+    print("=== Running Global Search ===")
+    global_rag = GlobalGraphRAG()
+    communities = global_rag.global_search(query)
+
+    print(f"Retrieved {len(communities)} communities")
+
+    print("\n=== Running Local Search ===")
+    local_rag = LocalGraphRAG()
+    chunks = local_rag.chunk_entity_similarity(query)
+
+    print(f"Retrieved {len(chunks)} chunks")
+
+    print("\n=== Generating Answer ===")
     generator = SemRAGAnswerGenerator()
-    result = generator.generate_answer(query)
+
+    result = generator.generate_answer(
+        query=query,
+        communities=communities,
+        chunks=chunks
+    )
 
     print("\n=== QUESTION ===")
     print(result["query"])
