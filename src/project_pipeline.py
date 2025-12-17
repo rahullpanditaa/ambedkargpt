@@ -14,3 +14,4 @@
 
 # Retrieval
 # 10 - community embedding - embed community level summaries - src/retrieval/community_embeddings.py
+# 11 - local graph rag search - equation 4 of semrag paper - src/retrieval/local_search.py

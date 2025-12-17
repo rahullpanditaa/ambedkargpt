@@ -1,3 +1,15 @@
+"""
+Local Graph RAG (SemRAG) retrieval implementation.
+
+This module implements the Local Graph RAG retrieval strategy
+described in Equation (4) of the SemRAG paper. The approach
+retrieves relevant entities for a user query, expands them via
+graph neighborhoods, and scores semantic chunks based on
+entity relevance and frequency.
+
+The output is a ranked list of chunks most relevant to the query,
+grounded in the local structure of the knowledge graph.
+"""
 import json
 import numpy as np
 import networkx as nx
@@ -17,6 +29,17 @@ from src.utils.constants import (
 )
 
 class LocalGraphRAG:
+    """
+    Local Graph RAG retriever.
+
+    This class performs query-time retrieval using:
+    - Semantic similarity between query and entities
+    - Graph-based expansion over the entity co-occurrence graph
+    - Chunk scoring based on entity relevance and frequency
+
+    The implementation corresponds directly to Equation (4)
+    in the SemRAG research paper.
+    """
     def __init__(self, model_name="all-MiniLM-L6-v2"):
         self.model = SentenceTransformer(model_name_or_path=model_name)
         self.entity_texts: list[str] = []
@@ -24,8 +47,14 @@ class LocalGraphRAG:
 
     def _get_entity_texts(self) -> list[str]:
         """
-        Load and deduplicate all entities per chunk from chunk_entities.json.
-        Returns the list and caches it.
+        Load and deduplicate all entities from chunk-level entity data.
+
+        Reads entity surface forms from CHUNK_ENTITIES_PATH, removes
+        duplicates, and caches the resulting list. Any existing
+        entity embedding cache is invalidated.
+
+        Returns:
+            list[str]: List of unique normalized entity strings
         """
         # need embedding for every entity
         with open(CHUNK_ENTITIES_PATH, "r") as f:
@@ -44,6 +73,20 @@ class LocalGraphRAG:
     def _retrieve_entitities(self, user_query: str) -> list[dict]:
         """
         Retrieve entities semantically similar to the user query.
+
+        Computes cosine similarity between the query embedding and
+        all cached entity embeddings, filtering by a minimum
+        similarity threshold.
+
+        Args:
+            user_query (str): User query string
+
+        Returns:
+            list[dict]: Sorted list of entities with similarity scores:
+                {
+                    "entity": str,
+                    "score": float
+                }
         """
         query_embedding = self.model.encode([user_query])[0]
 
@@ -70,7 +113,17 @@ class LocalGraphRAG:
     
     def _expand_recall_via_graph_neighbours(self, user_query: str):
         """
-        Expand query-relevant entities using graph neighbors.
+        Expand query-relevant entities using graph neighborhood traversal.
+
+        Starts from top query-matched entities and propagates relevance
+        scores to neighboring entities in the knowledge graph using
+        edge weights and decay.
+
+        Args:
+            user_query (str): User query string
+
+        Returns:
+            list[dict]: Expanded list of entities with propagated scores
         """
         sorted_scores = self._retrieve_entitities(user_query=user_query)
 
@@ -120,7 +173,18 @@ class LocalGraphRAG:
     
     def chunk_entity_similarity(self, user_query: str, k:int = 20):
         """
-        Equation (4): Score chunks using entity relevance × entity frequency.
+        Score semantic chunks using Local Graph RAG (Equation 4).
+
+        Each chunk is scored by summing the product of:
+        - entity relevance score (after graph expansion)
+        - entity frequency within the chunk
+
+        Args:
+            user_query (str): User query string
+            k (int): Number of top chunks to return
+
+        Returns:
+            list[dict]: Top-k ranked chunks with relevance scores
         """
         # retrieve entities relevant to the query
         retrieved_entities = self._expand_recall_via_graph_neighbours(user_query=user_query)
