@@ -19,3 +19,9 @@ SEGMENTS_DISTANCES_PATH = PROCESSED_DATA_DIR_PATH / "segment_distances.npy"
 # SEGMENTS_METADATA_PATH = PROCESSED_DATA_DIR_PATH / "segments_metadata.json"
 
 CHUNKS_OUTPUT_PATH = PROCESSED_DATA_DIR_PATH / "chunks.json"
+
+# semantic chunking hyperparameters
+THETA = 0.30
+MAX_TOKENS = 1024
+SUBCHUNK_SIZE = 128
+SUBCHUNK_OVERLAP = 32

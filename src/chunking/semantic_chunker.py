@@ -1,20 +1,64 @@
+"""
+Semantic chunking implementation for the SemRAG pipeline.
+
+This module implements Algorithm 1 from the SemRAG paper:
+- Uses cosine distance between adjacent buffer-merged units
+- Groups merged units into semantically coherent chunks
+- Enforces token limits via overlapping sub-chunking
+
+The output of this module represents the final semantic chunks (C),
+which are used downstream for knowledge graph construction and retrieval.
+"""
+
 import json
 import numpy as np
+from transformers import AutoTokenizer
 from src.utils.constants import (
     SEGMENTS_DISTANCES_PATH,
     BUFFER_MERGE_RESULTS_PATH,
     BOOK_SENTENCES_PATH,
-    CHUNKS_OUTPUT_PATH
+    CHUNKS_OUTPUT_PATH,
+    THETA,
+    MAX_TOKENS,
+    SUBCHUNK_SIZE,
+    SUBCHUNK_OVERLAP
 )
-THETA = 0.30
-MAX_TOKENS = 1024
-SUBCHUNK_SIZE = 128
-SUBCHUNK_OVERLAP = 32
 
-from transformers import AutoTokenizer
+# # semantic chunking hyperparameters
+# THETA = 0.30
+# MAX_TOKENS = 1024
+# SUBCHUNK_SIZE = 128
+# SUBCHUNK_OVERLAP = 32
+
+
 
 class SemanticChunking:
+    """
+    Constructs semantic chunks from buffer-merged sentence units.
+
+    This class consumes:
+    - Buffer-merged units (Ŝ)
+    - Pairwise cosine distances between adjacent merged units
+
+    And produces:
+    - Semantically coherent chunks (C), optionally split into
+      overlapping sub-chunks to satisfy token constraints.
+
+    The implementation closely follows Algorithm 1 from the
+    SemRAG research paper.
+    """
     def __init__(self):
+        """
+        Initialize the semantic chunking pipeline.
+
+        Loads all required intermediate artifacts from disk:
+        - Cosine distances between adjacent merged units
+        - Buffer-merged units
+        - Original sentence metadata (for reconstruction)
+
+        Also initializes a tokenizer used for token counting
+        and sub-chunk splitting.
+        """
         # d[i] - distance bw merged unit i and i+1
         self.segment_distances = np.load(SEGMENTS_DISTANCES_PATH)
         
@@ -29,6 +73,28 @@ class SemanticChunking:
         self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
     def _chunk_reconstruction_from_sentences(self, chunk_unit_indices: list[int]) -> dict:
+        """
+        Reconstruct a semantic chunk from merged-unit indices.
+
+        Given a list of merged-unit indices that belong to the same
+        semantic chunk, this method:
+        - Collects all contributing sentence indices
+        - Deduplicates them while preserving original order
+        - Reconstructs the final chunk text
+        - Computes token count
+
+        Args:
+            chunk_unit_indices (list[int]): Indices of merged units
+                                            forming a semantic chunk
+
+        Returns:
+            dict: Chunk representation with schema:
+                {
+                    "sentence_indices": list[int],
+                    "text": str,
+                    "num_tokens": int
+                }
+        """
         # convert merged-units into final chunk text
         all_sentences_indices = []
 
@@ -56,7 +122,19 @@ class SemanticChunking:
         }
     
     def _split_large_chunk(self, chunk: dict) -> list[dict]:
+        """
+        Split an oversized chunk into overlapping sub-chunks.
 
+        If a chunk exceeds MAX_TOKENS, it is split into smaller
+        overlapping sub-chunks of size SUBCHUNK_SIZE with
+        SUBCHUNK_OVERLAP tokens of overlap to preserve continuity.
+
+        Args:
+            chunk (dict): Chunk object containing text and token count
+
+        Returns:
+            list[dict]: One or more chunk / sub-chunk objects
+        """
         if chunk["num_tokens"] <= MAX_TOKENS:
             return [chunk]
 
@@ -86,6 +164,28 @@ class SemanticChunking:
         return subchunks
     
     def create_chunks(self) -> list[dict]:
+        """
+        Construct semantic chunks using cosine distance thresholding.
+
+        Implements the core logic of Algorithm 1:
+        - Adjacent merged units are grouped if their cosine distance
+          is below THETA
+        - A semantic break starts a new chunk
+        - Oversized chunks are split into overlapping sub-chunks
+
+        Returns:
+            list[dict]: Final list of semantic chunks with schema:
+                {
+                    "chunk_id": int,
+                    "text": str,
+                    "sentence_indices": list[int],
+                    "num_tokens": int,
+                    "source_units": list[int]
+                }
+
+        Side Effects:
+            - Writes chunk data to CHUNKS_OUTPUT_PATH
+        """
         distances = self.segment_distances  
 
         chunks = []
@@ -128,6 +228,12 @@ class SemanticChunking:
         return final_chunks
     
 def create_chunks_command(limit: int=5):
+    """
+    CLI-style helper for running semantic chunking manually.
+
+    Args:
+        limit (int): Number of chunks to print for inspection
+    """
     sc = SemanticChunking()
     print(f"Creating chunks from 'data/Ambedkar_book.pdf'...")
     chunks = sc.create_chunks()
