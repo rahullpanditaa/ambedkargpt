@@ -14,6 +14,7 @@ import json
 import numpy as np
 from transformers import AutoTokenizer
 from src.utils.constants import (
+    PROCESSED_DATA_DIR_PATH,
     SEGMENTS_DISTANCES_PATH,
     BUFFER_MERGE_RESULTS_PATH,
     BOOK_SENTENCES_PATH,
@@ -23,14 +24,6 @@ from src.utils.constants import (
     SUBCHUNK_SIZE,
     SUBCHUNK_OVERLAP
 )
-
-# # semantic chunking hyperparameters
-# THETA = 0.30
-# MAX_TOKENS = 1024
-# SUBCHUNK_SIZE = 128
-# SUBCHUNK_OVERLAP = 32
-
-
 
 class SemanticChunking:
     """
@@ -59,6 +52,7 @@ class SemanticChunking:
         Also initializes a tokenizer used for token counting
         and sub-chunk splitting.
         """
+        PROCESSED_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
         # d[i] - distance bw merged unit i and i+1
         self.segment_distances = np.load(SEGMENTS_DISTANCES_PATH)
         

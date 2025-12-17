@@ -10,6 +10,7 @@ Formally, this corresponds to the construction of Ŝ (S-hat) in Algorithm 1.
 
 import json
 from src.utils.constants import (
+    PROCESSED_DATA_DIR_PATH, 
     BOOK_SENTENCES_PATH, 
     B, 
     BUFFER_MERGE_RESULTS_PATH
@@ -38,6 +39,7 @@ class BufferMerge:
         Side Effects:
             - Loads sentence data from BOOK_SENTENCES_PATH
         """
+        PROCESSED_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
         with open(BOOK_SENTENCES_PATH, "r") as f:
             sentences = json.load(f)
         self.sentences = sentences["sentences"]

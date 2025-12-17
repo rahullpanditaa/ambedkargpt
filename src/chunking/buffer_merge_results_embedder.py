@@ -15,6 +15,7 @@ The resulting artifacts are:
 import json
 import numpy as np
 from src.utils.constants import (
+    PROCESSED_DATA_DIR_PATH,
     BUFFER_MERGE_RESULTS_PATH,
     SEGMENTS_EMBEDDINGS_PATH,
     SEGMENTS_DISTANCES_PATH
@@ -47,6 +48,7 @@ class MergedUnitsEmbedder:
             - Loads buffer-merged units from disk
             - Initializes the embedding model
         """
+        PROCESSED_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
         with open(BUFFER_MERGE_RESULTS_PATH, "r") as f:
             buffer_merge_results = json.load(f)
         self.merged_units = buffer_merge_results["buffer_merge_results"]
