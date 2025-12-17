@@ -91,3 +91,16 @@ def global_search(query: str):
             f"final_score={r['final_score']:.3f}"
         )
         print(r["chunk_text"][:300], "\n")
+
+def answer(query: str):
+    """
+    Run full SemRAG pipeline and generate final answer.
+    """
+    generator = SemRAGAnswerGenerator()
+    result = generator.generate_answer(query)
+
+    print("\n=== QUESTION ===")
+    print(result["query"])
+
+    print("\n=== ANSWER ===")
+    print(result["answer"])

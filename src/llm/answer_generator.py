@@ -138,7 +138,6 @@ class SemRAGAnswerGenerator:
 
         answer_text = response.response.strip()
 
-        #
         output = {
             "query": user_query,
             "answer": answer_text,
