@@ -1,75 +1,91 @@
 import json
-from sentence_transformers import SentenceTransformer
-from pathlib import Path
 import numpy as np
 import networkx as nx
 import pickle
-
-
-DATA_DIR_PATH = Path(__file__).parent.parent.parent.resolve() / "data"
-PROCESSED_DATA_DIR_PATH = DATA_DIR_PATH / "processed"
-COMMUNITY_SUMMARIES_PATH = PROCESSED_DATA_DIR_PATH / "community_summaries.json"
-COMMUNITY_EMBEDDINGS_PATH = PROCESSED_DATA_DIR_PATH / "community_embeddings.npy"
-CHUNK_ENTITIES_PATH = PROCESSED_DATA_DIR_PATH / "chunk_entities.json"
-KNOWLEDGE_GRAPH_PATH = PROCESSED_DATA_DIR_PATH / "knowledge_graph.pkl"
-
-LOCAL_SEARCH_RESULTS = PROCESSED_DATA_DIR_PATH / "local_search_results.json"
-
-# hyperparameters
-MAX_SEED_ENTITIES = 10        # only expand from top-N entities
-MAX_NEIGHBORS_PER_ENTITY = 5 # prevent explosion
-NEIGHBOR_DECAY = 0.6          # neighbors are weaker than seeds
-MIN_NEIGHBOR_WEIGHT = 1       # ignore very weak edges
+from sentence_transformers import SentenceTransformer
+from src.utils.constants import (
+    PROCESSED_DATA_DIR_PATH,
+    CHUNK_ENTITIES_PATH, 
+    KNOWLEDGE_GRAPH_PATH,
+    LOCAL_SEARCH_RESULTS_PATH,
+    MAX_SEED_ENTITIES, 
+    MAX_NEIGHBORS_PER_ENTITY, 
+    NEIGHBOR_DECAY,
+    MIN_NEIGHBOR_WEIGHT,
+    MIN_ENTITY_RELEVANCE_SCORE,
+    MIN_SIMILARIY_SCORE_QUERY_ENTITY
+)
 
 class LocalGraphRAG:
     def __init__(self, model_name="all-MiniLM-L6-v2"):
         self.model = SentenceTransformer(model_name_or_path=model_name)
+        self.entity_texts: list[str] = []
+        self.entity_texts_embeddings: np.ndarray = None
 
     def _get_entity_texts(self) -> list[str]:
+        """
+        Load and deduplicate all entities per chunk from chunk_entities.json.
+        Returns the list and caches it.
+        """
         # need embedding for every entity
         with open(CHUNK_ENTITIES_PATH, "r") as f:
             chunk_entities: list[dict] = json.load(f)["chunk_entities"]
-        entity_texts: list[str] = []
+        
+        entity_texts = set()
         for chunk in chunk_entities:
-            entities = chunk["entities"]
-            for ent in entities:
-                entity_texts.append(ent["text_norm"])
-        return entity_texts
+            for entity in chunk["entities"]:
+                entity_texts.add(entity["text_norm"])
+
+        self.entity_texts = list(entity_texts)
+        self.entity_texts_embeddings = None
+        return self.entity_texts
+
     
-    def _retrieve_entitities(self, user_query: str):
+    def _retrieve_entitities(self, user_query: str) -> list[dict]:
+        """
+        Retrieve entities semantically similar to the user query.
+        """
         query_embedding = self.model.encode([user_query])[0]
 
-        entity_texts = self._get_entity_texts()
-        entity_texts_embeddings = self.model.encode(entity_texts)
+        if not self.entity_texts:
+            self._get_entity_texts()
+
+        if self.entity_texts_embeddings is None:
+            self.entity_texts_embeddings = self.model.encode(self.entity_texts)
+        
 
         query_entities_sim_scores = []
 
-        for i, ent_emb in enumerate(entity_texts_embeddings):
+        for i, ent_emb in enumerate(self.entity_texts_embeddings):
             sim_score = _cosine_similarity(vec1=ent_emb, vec2=query_embedding)
-            if sim_score >= 0.4:
+            if sim_score >= MIN_SIMILARIY_SCORE_QUERY_ENTITY:
                 query_entities_sim_scores.append({
-                    "entity": entity_texts[i],
+                    "entity": self.entity_texts[i],
                     "score": sim_score
                 })
 
         # sort by similarity score desc
         sorted_scores = sorted(query_entities_sim_scores, key=lambda d: d["score"], reverse=True)
-        # return sorted_scores
-
-        # expand via graph neighbours
-        with open(KNOWLEDGE_GRAPH_PATH, "rb") as f:
-            knowledge_graph: nx.Graph = pickle.load(f)
+        return sorted_scores
     
-        # for entity_score in sorted_scores:
-        #     entity_neighbours = list(knowledge_graph.neighbors(entity_score))
-            
-        expanded_entity_scores = {}
+    def _expand_recall_via_graph_neighbours(self, user_query: str):
+        """
+        Expand query-relevant entities using graph neighbors.
+        """
+        sorted_scores = self._retrieve_entitities(user_query=user_query)
+
+        try:
+            with open(KNOWLEDGE_GRAPH_PATH, "rb") as f:
+                knowledge_graph: nx.Graph = pickle.load(f)
+        except Exception as e:
+            raise RuntimeError(f"Knowledge graph missing or unreadable: {KNOWLEDGE_GRAPH_PATH.name}") from e
+        
+        expanded_entity_scores: dict[str, float] = {}
         for item in sorted_scores[:MAX_SEED_ENTITIES]:
-            entity = item["entity"]
-            score = item["score"]
+            expanded_entity_scores[item["entity"]] = item["score"]
 
             # max score if entity reappears
-            expanded_entity_scores[entity] = max(expanded_entity_scores.get(entity, 0.0), score)
+            # expanded_entity_scores[entity] = max(expanded_entity_scores.get(entity, 0.0), score)
 
         # expand - graph neigbours
         for item in sorted_scores[:MAX_SEED_ENTITIES]:
@@ -94,30 +110,28 @@ class LocalGraphRAG:
 
                 expanded_entity_scores[neighbour] = max(expanded_entity_scores.get(neighbour, 0.0), neighbour_score)
 
-            expanded_query_entities = [
+        expanded_query_entities = [
                 {"entity": ent, "score": score}
                 for ent, score in expanded_entity_scores.items()
             ]
 
-            expanded_query_entities.sort(key=lambda d: d["score"], reverse=True)
-            return expanded_query_entities
+        expanded_query_entities.sort(key=lambda d: d["score"], reverse=True)
+        return expanded_query_entities
     
-
-    
-    def _expand_recall_via_graph_neighbours(self):
-            ... 
-
-    def _chunk_entity_similarity(self, k:int = 20):
+    def chunk_entity_similarity(self, user_query: str, k:int = 20):
+        """
+        Equation (4): Score chunks using entity relevance × entity frequency.
+        """
         # retrieve entities relevant to the query
-        retrieved_entities = self._retrieve_entitities()
+        retrieved_entities = self._expand_recall_via_graph_neighbours(user_query=user_query)
 
         active_entities = []
         entity_score_map = {}
 
-        for entity_score in retrieved_entities:
-            if entity_score["score"] > 0.6:
-                active_entities.append(entity_score["entity"])
-                entity_score_map[entity_score["entity"]] = entity_score["score"]
+        for entity in retrieved_entities:
+            if entity["score"] > MIN_ENTITY_RELEVANCE_SCORE:
+                active_entities.append(entity["entity"])
+                entity_score_map[entity["entity"]] = entity["score"]
 
         if not active_entities:
             return []
@@ -137,21 +151,14 @@ class LocalGraphRAG:
                 entity_text = entity["text_norm"]
                 count = entity.get("count", 1)
 
-                # entity -> chunks
-                if entity_text not in entity_to_chunk_ids_map:
-                    entity_to_chunk_ids_map[entity_text] = []
-                entity_to_chunk_ids_map[entity_text].append(chunk_id)
-
-                # chunk -> entity freq
+                entity_to_chunk_ids_map.setdefault(entity_text, set()).add(chunk_id)
                 chunk_entity_freq_map[chunk_id][entity_text] = count
 
         # collect candidate chunk ids
         candidate_chunk_ids = set()
 
         for active_entity in active_entities:
-            if active_entity in entity_to_chunk_ids_map:
-                for cid in entity_to_chunk_ids_map[active_entity]:
-                    candidate_chunk_ids.add(cid)
+            candidate_chunk_ids |= entity_to_chunk_ids_map.get(active_entity, set())
 
         if not candidate_chunk_ids:
             return []
@@ -164,84 +171,30 @@ class LocalGraphRAG:
             ch["chunk_id"]: ch["text"] for ch in chunks
         }
 
-        # 
         scored_chunks = []
 
-        for chunk_id in candidate_chunk_ids:
+        for cid in candidate_chunk_ids:
             score = 0.0
-
-            #for each active entity in this chunk
-            for entity in active_entities:
-                if entity in chunk_entity_freq_map.get(chunk_id, {}):
-                    entity_weight = entity_score_map[entity]
-                    entity_freq = chunk_entity_freq_map[chunk_id][entity]
-
-                    # contribution = entity relevance * frequency in chunk
-                    score += entity_weight * entity_freq
+            for ent in active_entities:
+                if ent in chunk_entity_freq_map[cid]:
+                    score += (
+                        entity_score_map[ent] *
+                        chunk_entity_freq_map[cid][ent]
+                    )
 
             if score > 0:
                 scored_chunks.append({
-                    "chunk_id": chunk_id,
-                    "chunk_text": chunk_id_to_text.get(chunk_id, ""),
+                    "chunk_id": cid,
+                    "chunk_text": chunk_id_to_text.get(cid, ""),
                     "score": score
                 })
 
-        # sort by relevance
         scored_chunks.sort(key=lambda d: d["score"], reverse=True)
-        # EQUATION 4 done
 
-        with open(LOCAL_SEARCH_RESULTS, "w") as f:
+        with open(LOCAL_SEARCH_RESULTS_PATH, "w") as f:
             json.dump({"local_search_results": scored_chunks}, f, indent=2)
 
-        return scored_chunks[:k]
-
-
-
-        # def _chunk_entity_similarity(self):
-        #     retrieved_entities = self._retrieve_entitities()
-
-        #     # only keep entities with score above certain threshold
-        #     active_entities = []
-        #     for entity_score in retrieved_entities:
-        #         if entity_score["score"] > 0.6:
-        #             active_entities.append(entity_score["entity"])
-
-        #     # need entity -> chunk ids mapping
-        #     with open(CHUNK_ENTITIES_PATH, "r") as f:
-    #         # list[dict], where dict keys -> chunk_id, entities: list[dict - text_norm]
-    #         chunk_entities: list[dict] = json.load(f)["chunk_entities"]
-    #     entity_to_chunk_ids_map = {}
-    #     for chunk in chunk_entities:
-    #         # current_chunk_entities = []
-    #         for entity in chunk["entities"]:
-    #             entity_text = entity["text_norm"]
-    #             if entity_text not in entity_to_chunk_ids_map:
-    #                 entity_to_chunk_ids_map[entity_text] = []
-    #             entity_to_chunk_ids_map[entity_text].append(chunk["chunk_id"])
-            
-    #     # also need the chunk text itself
-    #     with open(PROCESSED_DATA_DIR_PATH / "chunks.json", "r") as f:
-    #         # list[dict] where dict keys - chunk_id, text , ...
-    #         chunks = json.load(f)["chunks"]
-
-    #     canditate_chunk_ids = set()
-    #     for active_entity in active_entities:
-    #         if active_entity in entity_to_chunk_ids_map:
-    #             canditate_chunk_ids.add(*entity_to_chunk_ids_map[active_entity])
-
-    #     candidate_chunks = []
-    #     for chunk in chunks:
-    #         if chunk["chunk_id"] in canditate_chunk_ids:
-    #             candidate_chunks.append({
-    #                 "chunk_id": chunk["chunk_id"],
-    #                 "chunk_text": chunk["text"]
-    #             })
-
-    #     # compute relevance score for each candidate chunk
-
-
-        
-        
+        return scored_chunks[:k]     
 
 def _cosine_similarity(vec1, vec2):
     dot_product = np.dot(vec1, vec2)
