@@ -1,6 +1,6 @@
 
 import argparse
-from cli_commands import (
+from .cli_commands import (
     build_index_command,
     local_search_command,
     global_search_command,

@@ -49,6 +49,9 @@ def build_index_command():
     ee = EntityExtractor()
     ee.create_chunk_entities()
 
+    re = RelationshipExtractor()
+    re.save_relationships()
+
     gb = GraphBuilder()
     gb.save_graph()
 
