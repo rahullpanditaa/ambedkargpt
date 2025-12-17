@@ -250,7 +250,7 @@ class LocalGraphRAG:
                 scored_chunks.append({
                     "chunk_id": cid,
                     "chunk_text": chunk_id_to_text.get(cid, ""),
-                    "score": score
+                    "score": float(score)
                 })
 
         scored_chunks.sort(key=lambda d: d["score"], reverse=True)
