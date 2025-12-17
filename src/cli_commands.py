@@ -65,5 +65,14 @@ def build_index_command():
 
     print("=== Index build complete ===")
 
+def local_search_command(query: str):
+    """
+    Run Local Graph RAG search.
+    """
+    rag = LocalGraphRAG()
+    results = rag.chunk_entity_similarity(query)
 
-    
+    print("\n=== Local Search Results ===")
+    for i, r in enumerate(results, 1):
+        print(f"{i}. (score={r['score']:.3f})")
+        print(r["chunk_text"][:300], "\n")
