@@ -1,92 +1,195 @@
+"""
+Global Graph RAG retrieval implementation (SemRAG – Equation 5).
+
+This module implements the Global Graph RAG strategy described in the
+SemRAG paper. Global search operates at the level of graph communities
+instead of individual chunks or entities.
+
+High-level idea:
+1. Embed the user query
+2. Retrieve the most relevant communities using community summaries
+3. Use selected communities to route the query into Local Graph RAG
+4. Aggregate and return locally retrieved chunks
+
+This allows:
+- High recall across the corpus
+- Thematic routing before fine-grained retrieval
+- Scalable retrieval over large knowledge graphs
+"""
+
 import json
 import numpy as np
 from pathlib import Path
-from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
-DATA_DIR_PATH = Path(__file__).parent.parent.parent / "data"
-PROCESSED_DATA_DIR_PATH = DATA_DIR_PATH / "processed"
-
-COMMUNITY_SUMMARIES_PATH = PROCESSED_DATA_DIR_PATH / "community_summaries.json"
-COMMUNITY_EMBEDDINGS_PATH = PROCESSED_DATA_DIR_PATH / "community_embeddings.npy"
-COMMUNITY_CHUNKS_PATH = PROCESSED_DATA_DIR_PATH / "community_chunks.json"
-CHUNKS_PATH = PROCESSED_DATA_DIR_PATH / "chunks.json"
+from src.retrieval.local_search import LocalGraphRAG
+from src.utils.constants import (
+    COMMUNITY_SUMMARIES_PATH,
+    COMMUNITY_EMBEDDINGS_PATH,
+    GLOBAL_SEARCH_RESULTS_PATH,
+    TOP_K_COMMUNITIES,
+    TOP_K_CHUNKS_PER_COMMUNITY
+)
 
 
 class GlobalGraphRAG:
-    def __init__(self, model_name="all-MiniLM-L6-v2"):
+    """
+    Global Graph RAG retriever.
+
+    This class implements Equation (5) from the SemRAG paper:
+    - Communities act as high-level semantic units
+    - Each community is represented by an LLM-generated summary
+    - Queries are matched to communities first, then refined locally
+
+    The retriever composes:
+    - Community-level semantic search
+    - Local Graph RAG (Equation 4) for final chunk scoring
+    """
+
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+        """
+        Initialize the Global Graph RAG retriever.
+
+        Loads:
+        - Community summaries
+        - Precomputed community embeddings
+        - Initializes LocalGraphRAG for second-stage retrieval
+
+        Args:
+            model_name (str): SentenceTransformer model used for
+                              query–community similarity
+        """
+
         self.model = SentenceTransformer(model_name_or_path=model_name)
 
-        # load summaries
+        # load community summaries
         with open(COMMUNITY_SUMMARIES_PATH, "r") as f:
-            self.community_summaries = json.load(f)
+            self.community_summaries: list[dict] = json.load(f)
 
-        # load embeddings
-        self.community_embeddings = np.load(COMMUNITY_EMBEDDINGS_PATH)
+        self.community_embeddings: np.ndarray = np.load(COMMUNITY_EMBEDDINGS_PATH)
 
-        # load community -> chunk_ids
-        with open(COMMUNITY_CHUNKS_PATH, "r") as f:
-            self.community_to_chunks = json.load(f)
+        if len(self.community_summaries) != len(self.community_embeddings):
+            raise ValueError("Mismatch between number of community summaries and number of community embeddings")
 
-        # load chunks
-        with open(CHUNKS_PATH, "r") as f:
-            self.chunks = json.load(f)["chunks"]
+        # local Graph RAG instance (Equation 4)
+        self.local_rag = LocalGraphRAG(model_name=model_name)
 
-        self.chunk_id_to_text = {
-            ch["chunk_id"]: ch["text"] for ch in self.chunks
-        }
+    def _retrieve_relevant_communities(self, user_query: str, k: int = TOP_K_COMMUNITIES) -> list[dict]:
+        """
+        Retrieve the most relevant communities for a user query.
 
-    def global_search(self, query: str, top_k_communities=3, top_k_chunks=8):
-        query_emb = self.model.encode([query], normalize_embeddings=True)
+        Core of Equation (5):
+        similarity(query, community_summary)
 
-        # similarity with community summaries
-        sim_scores = cosine_similarity(query_emb, self.community_embeddings)[0]
+        Args:
+            user_query (str): User query string
+            k (int): Number of top communities to retrieve
+
+        Returns:
+            list[dict]: Ranked communities with similarity scores:
+                {
+                    "community_id": int,
+                    "score": float,
+                    "summary": str
+                }
+        """
+
+        # embeduser query
+        query_embedding = self.model.encode([user_query])[0]
 
         community_scores = []
-        for idx, score in enumerate(sim_scores):
-            community_id = self.community_summaries[idx]["community_id"]
+
+        for idx, comm_emb in enumerate(self.community_embeddings):
+            score = _cosine_similarity(comm_emb, query_embedding)
+
             community_scores.append({
-                "community_id": community_id,
-                "score": float(score)
+                "community_id": self.community_summaries[idx]["community_id"],
+                "summary": self.community_summaries[idx]["summary"],
+                "score": score
             })
 
-        # select top k communities
         community_scores.sort(key=lambda d: d["score"], reverse=True)
-        top_communities = community_scores[:top_k_communities]
 
-        # 
-        candidate_chunk_ids = set()
-        for c in top_communities:
-            cid = str(c["community_id"])
-            candidate_chunk_ids.update(self.community_to_chunks.get(cid, []))
+        return community_scores[:k]
 
-        # Step 5: Score chunks w.r.t query
-        candidate_texts = []
-        chunk_ids = []
+    def global_search(self, user_query: str, top_k_chunks: int = TOP_K_CHUNKS_PER_COMMUNITY) -> list[dict]:
+        """
+        Perform Global Graph RAG retrieval.
 
-        for cid in candidate_chunk_ids:
-            if cid in self.chunk_id_to_text:
-                candidate_texts.append(self.chunk_id_to_text[cid])
-                chunk_ids.append(cid)
+        Algorithm (SemRAG – Equation 5):
+        1. Retrieve top-K relevant communities
+        2. For each community:
+            - Route the query into Local Graph RAG
+            - Retrieve locally relevant chunks
+        3. Aggregate and rank all retrieved chunks
 
-        if not candidate_texts:
-            return []
+        Args:
+            user_query (str): User query string
+            top_k_chunks (int): Max chunks retrieved per community
 
-        chunk_embeddings = self.embedding_model.encode(
-            candidate_texts, normalize_embeddings=True
+        Returns:
+            list[dict]: Ranked chunks across all communities
+        """
+
+        # community-level retrieval
+        top_communities = self._retrieve_relevant_communities(user_query)
+
+        all_retrieved_chunks = []
+
+        # send user query to local graph rag
+        for comm in top_communities:
+            local_chunks = self.local_rag.chunk_entity_similarity(user_query=user_query, k=top_k_chunks)
+
+            for ch in local_chunks:
+                all_retrieved_chunks.append({
+                    "community_id": comm["community_id"],
+                    "community_score": comm["score"],
+                    "chunk_id": ch["chunk_id"],
+                    "chunk_text": ch["chunk_text"],
+                    "local_score": ch["score"]
+                })
+
+        # agg scores
+        # final score combines:
+        # - community relevance (global)
+        # - chunk relevance (local)
+        for item in all_retrieved_chunks:
+            item["final_score"] = (
+                item["community_score"] * item["local_score"]
+            )
+
+        # sort final results
+        all_retrieved_chunks.sort(
+            key=lambda d: d["final_score"],
+            reverse=True
         )
+        
+        with open(GLOBAL_SEARCH_RESULTS_PATH, "w") as f:
+            json.dump(
+                {"global_search_results": all_retrieved_chunks},
+                f,
+                indent=2
+            )
 
-        chunk_scores = cosine_similarity(query_emb, chunk_embeddings)[0]
+        return all_retrieved_chunks
 
-        scored_chunks = []
-        for i, score in enumerate(chunk_scores):
-            scored_chunks.append({
-                "chunk_id": chunk_ids[i],
-                "chunk_text": candidate_texts[i],
-                "score": float(score)
-            })
 
-        # Step 6: Rank and select top chunks
-        scored_chunks.sort(key=lambda d: d["score"], reverse=True)
+def _cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
+    """
+    Compute cosine similarity between two vectors.
 
-        return scored_chunks[:top_k_chunks]
+    Args:
+        vec1 (np.ndarray): First vector
+        vec2 (np.ndarray): Second vector
+
+    Returns:
+        float: Cosine similarity score
+    """
+
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
+
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+
+    return float(np.dot(vec1, vec2) / (norm1 * norm2))
