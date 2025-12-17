@@ -13,6 +13,7 @@ COMMUNITY_EMBEDDINGS_PATH = PROCESSED_DATA_DIR_PATH / "community_embeddings.npy"
 CHUNK_ENTITIES_PATH = PROCESSED_DATA_DIR_PATH / "chunk_entities.json"
 KNOWLEDGE_GRAPH_PATH = PROCESSED_DATA_DIR_PATH / "knowledge_graph.pkl"
 
+LOCAL_SEARCH_RESULTS = PROCESSED_DATA_DIR_PATH / "local_search_results.json"
 
 # hyperparameters
 MAX_SEED_ENTITIES = 10        # only expand from top-N entities
@@ -106,7 +107,7 @@ class LocalGraphRAG:
     def _expand_recall_via_graph_neighbours(self):
             ... 
 
-    def _chunk_entity_similarity(self):
+    def _chunk_entity_similarity(self, k:int = 20):
         # retrieve entities relevant to the query
         retrieved_entities = self._retrieve_entitities()
 
@@ -187,8 +188,12 @@ class LocalGraphRAG:
 
         # sort by relevance
         scored_chunks.sort(key=lambda d: d["score"], reverse=True)
+        # EQUATION 4 done
 
-        return scored_chunks
+        with open(LOCAL_SEARCH_RESULTS, "w") as f:
+            json.dump({"local_search_results": scored_chunks}, f, indent=2)
+            
+        return scored_chunks[:k]
 
 
     # def _chunk_entity_similarity(self):
