@@ -12,6 +12,7 @@ community and prompting a local LLM to synthesize their themes.
 import json
 import ollama
 from pathlib import Path
+import time
 from src.utils.constants import (
     PROCESSED_DATA_DIR_PATH, 
     ENTITY_COMMUNITY_PATH, 
@@ -219,8 +220,11 @@ class CommunitySummarizer:
                 chunk_texts.append(chunk["text"])
             llm_input_chunks_text = "\n\n---\n\n".join(chunk_texts)
             prompt = PROMPT.replace("{CHUNKS_TEXT}", llm_input_chunks_text)
+            start_time = time.perf_counter()
             response = ollama.generate(model="mistral", prompt=prompt)
             output = response.response
+            end_time = time.perf_counter()
+            summarization_time = end_time - start_time
             if not output:
                 continue
             summaries.append({
@@ -229,6 +233,7 @@ class CommunitySummarizer:
             })
             print(f"Community {community_id} summary:")
             print(f" - {output[:100]}...\n")
+            print(f" - Summarization took {summarization_time:.3f} seconds")
 
         with open(COMMUNITY_SUMMARIES_PATH, "w") as f:
             json.dump(summaries, f, indent=2)
