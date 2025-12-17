@@ -8,21 +8,56 @@ from src.utils.constants import (
 )
 
 class PDFIngestion:
+    """
+    Handles ingestion and structural decomposition of a raw PDF document.
+
+    Responsibilities:
+    - Split raw PDF text into pages
+    - Extract paragraph-level units with page provenance
+    - Extract sentence-level units with stable global IDs
+    - Persist intermediate artifacts for downstream pipeline stages
+    """
     def __init__(self, pdf=RAW_BOOK_TEXT):
+        """
+        Initialize the ingestion pipeline with raw PDF text.
+
+        Args:
+            pdf (str): Full raw text of the PDF. Pages are expected to be
+                       delimited by the form-feed character ('\\x0c').
+
+        Attributes:
+            pages (list[str]): Cleaned page-level text extracted from the PDF
+            paragraphs (list[dict]): Paragraph metadata populated after extraction
+            sentences (list[dict]): Sentence metadata populated after extraction
+        """
 
         # each str is an entire page's text
         self.pages: list[str] = [p for p in pdf.split("\x0c") if p.strip() != ""]
-        self.paragraphs: list[dict] = []
-        self.sentences = []
-
-    # @property
-    # def paragraphs(self) -> list[dict]:
-    #     if len(self._paragraphs) == 0:
-    #         self._extract_paragraphs()
-    #     return self._paragraphs
+        # self.paragraphs: list[dict] = []
+        # self.sentences = []
 
     # each page of text -> list of paragraphs
     def _extract_paragraphs(self) -> list[dict]:
+        """
+        Extract paragraph-level units from each page of the document.
+
+        Paragraphs are detected using blank lines as boundaries.
+        Each paragraph retains provenance metadata including:
+        - Page number
+        - Paragraph index within the page
+
+        Returns:
+            list[dict]: List of paragraph objects with schema:
+                {
+                    "page": int,
+                    "para_idx": int,
+                    "text": str
+                }
+
+        Side Effects:
+            - Creates the processed data directory if it does not exist
+            - Writes paragraph data to BOOK_PARAGRAPHS_PATH
+        """
         paragraphs = []
         for page_number, page_text in enumerate(self.pages, 1):
 
@@ -63,15 +98,39 @@ class PDFIngestion:
         PROCESSED_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
         with open(BOOK_PARAGRAPHS_PATH, "w") as f:
             json.dump({"paragraphs": paragraphs}, f, indent=2)
-        self.paragraphs = paragraphs
+        # self.paragraphs = paragraphs
         return paragraphs
     
-    def _extract_sentences(self):
+    def extract_sentences(self):
+        """
+        Split extracted paragraphs into sentence-level units.
+
+        Uses spaCy's lightweight sentencizer (rule-based) to avoid
+        unnecessary NLP overhead. Each sentence is assigned a stable
+        global ID and retains paragraph and page provenance.
+
+        Returns:
+            list[dict]: List of sentence objects with schema:
+                {
+                    "id": str,
+                    "page": int,
+                    "para_idx": int,
+                    "sentence_idx": int,
+                    "text": str
+                }
+
+        Side Effects:
+            - Writes sentence data to BOOK_SENTENCES_PATH
+
+        Preconditions:
+            - _extract_paragraphs must be called first
+        """
+        paragraphs = self._extract_paragraphs()
         sentences = []
         nlp = spacy.blank("en")
         nlp.add_pipe("sentencizer")
         global_id = 1
-        for paragraph in self.paragraphs:
+        for paragraph in paragraphs:
             doc = nlp(paragraph["text"])
             sentence_idx = 0
             for sentence in doc.sents:                
@@ -94,5 +153,5 @@ class PDFIngestion:
                 "document": "Ambedkar_book.pdf",
                 "sentences": sentences},
                 f, indent=2)
-        self.sentences = sentences
+        # self.sentences = sentences
         return sentences

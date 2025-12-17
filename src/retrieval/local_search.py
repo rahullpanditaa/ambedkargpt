@@ -192,21 +192,22 @@ class LocalGraphRAG:
 
         with open(LOCAL_SEARCH_RESULTS, "w") as f:
             json.dump({"local_search_results": scored_chunks}, f, indent=2)
-            
+
         return scored_chunks[:k]
 
 
-    # def _chunk_entity_similarity(self):
-    #     retrieved_entities = self._retrieve_entitities()
 
-    #     # only keep entities with score above certain threshold
-    #     active_entities = []
-    #     for entity_score in retrieved_entities:
-    #         if entity_score["score"] > 0.6:
-    #             active_entities.append(entity_score["entity"])
+        # def _chunk_entity_similarity(self):
+        #     retrieved_entities = self._retrieve_entitities()
 
-    #     # need entity -> chunk ids mapping
-    #     with open(CHUNK_ENTITIES_PATH, "r") as f:
+        #     # only keep entities with score above certain threshold
+        #     active_entities = []
+        #     for entity_score in retrieved_entities:
+        #         if entity_score["score"] > 0.6:
+        #             active_entities.append(entity_score["entity"])
+
+        #     # need entity -> chunk ids mapping
+        #     with open(CHUNK_ENTITIES_PATH, "r") as f:
     #         # list[dict], where dict keys -> chunk_id, entities: list[dict - text_norm]
     #         chunk_entities: list[dict] = json.load(f)["chunk_entities"]
     #     entity_to_chunk_ids_map = {}
