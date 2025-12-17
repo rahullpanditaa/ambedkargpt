@@ -74,3 +74,31 @@ MIN_ENTITY_RELEVANCE_SCORE = 0.6
 GLOBAL_SEARCH_RESULTS_PATH = PROCESSED_DATA_DIR_PATH / "global_search_results.json"
 TOP_K_COMMUNITIES = 3
 TOP_K_CHUNKS_PER_COMMUNITY = 8
+
+FINAL_ANSWER_PATH = PROCESSED_DATA_DIR_PATH / "final_answer.json"
+ANSWER_GENERATOR_PROMPT = """
+You are an expert academic assistant.
+
+You are answering a question using a structured knowledge graph
+and retrieved text passages from Dr. B. R. Ambedkar's writings.
+
+IMPORTANT RULES:
+- Use ONLY the information provided below.
+- Do NOT introduce external facts or assumptions.
+- Do NOT speculate beyond the text.
+- Maintain a neutral, academic tone.
+- Cite ideas implicitly by grounding them in the passages.
+
+QUESTION:
+{USER_QUERY}
+
+RELEVANT COMMUNITY SUMMARIES:
+{COMMUNITY_BLOCK}
+
+RELEVANT TEXT PASSAGES:
+{CHUNKS_BLOCK}
+
+TASK:
+Based strictly on the above information, write a clear,
+concise, and well-structured answer to the question.
+"""
