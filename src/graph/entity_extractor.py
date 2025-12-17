@@ -18,11 +18,6 @@ from src.utils.constants import (
     CHUNK_ENTITIES_PATH
 )
 
-# DATA_DIR_PATH = Path(__file__).parent.parent.parent.resolve() / "data"
-# PROCESSED_DATA_DIR_PATH = DATA_DIR_PATH / "processed"
-# CHUNKS_OUTPUT_PATH = PROCESSED_DATA_DIR_PATH / "chunks.json"
-# CHUNK_ENTITIES_PATH = PROCESSED_DATA_DIR_PATH / "chunk_entities.json"
-
 nlp = spacy.load("en_core_web_sm")
 
 class EntityExtractor:

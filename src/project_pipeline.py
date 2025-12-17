@@ -7,4 +7,4 @@
 
 # Graph:
 # 5 - entity extraction - semantic chunks - entity extraction per chunk - src/graph/entity_extractor.py
-# 6
+# 6 - relationship extractor - derive relationship bw entities based on co occurrence - src/graph/relationship_Extractor.py
