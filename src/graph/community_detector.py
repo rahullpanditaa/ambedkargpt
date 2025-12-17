@@ -1,15 +1,34 @@
+"""
+Community detection for the knowledge graph (SemRAG).
+
+This module applies the Leiden community detection algorithm
+to the entity co-occurrence knowledge graph. Detected communities
+represent thematically related groups of entities and are used
+in the Global Graph RAG retrieval step (Equation 5 in the SemRAG paper).
+"""
+
 import json
 import pickle
-from pathlib import Path
 import networkx as nx
 import igraph as ig
-
-DATA_DIR_PATH = Path(__file__).parent.parent.parent.resolve() / "data"
-PROCESSED_DATA_DIR_PATH = DATA_DIR_PATH / "processed"
-KNOWLEDGE_GRAPH_PATH = PROCESSED_DATA_DIR_PATH / "knowledge_graph.pkl"
-ENTITY_COMMUNITY_PATH = PROCESSED_DATA_DIR_PATH / "entity_communities.json"
+from src.utils.constants import (
+    PROCESSED_DATA_DIR_PATH,
+    KNOWLEDGE_GRAPH_PATH,
+    ENTITY_COMMUNITY_PATH
+)
 
 class CommunityDetector:
+    """
+    Detects communities in the knowledge graph using the Leiden algorithm.
+
+    This class:
+    - Loads the NetworkX knowledge graph
+    - Converts it into an iGraph-compatible format
+    - Runs Leiden community detection using edge weights
+    - Produces a mapping from entity → community ID
+
+    The resulting communities form the basis for Global Graph RAG search.
+    """
     def __init__(self):
         PROCESSED_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
         with open(KNOWLEDGE_GRAPH_PATH, "rb") as f:
@@ -20,35 +39,34 @@ class CommunityDetector:
         self.edge_weights = []
 
     def _map_entities_to_integers(self) -> dict:
+        """
+        Assign integer indices to graph nodes.
+
+        iGraph requires vertices to be represented as integer indices.
+        This method builds bidirectional mappings between:
+        - entity string ↔ integer index
+        """
         for id, node in enumerate(list(self.old_format_graph.nodes)):
-            # ent_idx_map.append({
-            #     "entity": node,
-            #     "index": id
-            # })
-            # ent_idx_map.append({
-            #     node: id,
-            #     id: node
-            # })
-            # ent_idx_map[node] = id
-            # ent_idx_map[id] = node
             self.entity_to_index_map[node] = id
             self.index_to_entity_map[id] = node
-
-        # return ent_idx_map
     
     def _convert_graph_edges_format(self):
+        """
+        Assign integer indices to graph nodes.
+
+        iGraph requires vertices to be represented as integer indices.
+        This method builds bidirectional mappings between:
+        - entity string ↔ integer index
+        """
         if not self.entity_to_index_map or not self.index_to_entity_map:
             self._map_entities_to_integers()
             
         new_graph_data = []
         new_graph_edges = []
         new_graph_weights = []
-        # seen_entities = set()
         for edge in self.old_format_graph.edges.data("weight"):
             src_ent = edge[0]
             trgt_ent = edge[1]
-            # seen_entities.add(src_ent)
-            # seen_entities.add(trgt_ent)
             weight = edge[2]
             src_idx = self.entity_to_index_map[src_ent]
             trgt_idx = self.entity_to_index_map[trgt_ent]
@@ -67,18 +85,33 @@ class CommunityDetector:
             "number_of_vertices": len(self.old_format_graph.nodes)
         }
     
-    def build_graph(self):
+    def _build_graph(self) -> ig.Graph:
+        """
+        Build an iGraph representation of the knowledge graph.
+
+        This converts the NetworkX graph into an iGraph.Graph
+        with weighted edges, which is required for Leiden clustering.
+        """
         new_graph_data = self._convert_graph_edges_format()
         n = new_graph_data["number_of_vertices"]
         edges = new_graph_data["edges"]
         weights = new_graph_data["weights"]
-        self.graph_for_leiden = ig.Graph(n=n, edges=edges, edge_attrs={"weight": weights})
+        leiden_graph = ig.Graph(n=n, edges=edges, edge_attrs={"weight": weights})
+        return leiden_graph
 
     def run_leiden(self):
-        if not self.graph_for_leiden:
-            self.build_graph()
+        """
+        Run the Leiden community detection algorithm.
 
-        leiden = self.graph_for_leiden.community_leiden(weights=self.edge_weights)
+        Produces a mapping from entity string → community ID
+        and persists the result to disk.
+
+        Side Effects:
+            - Writes entity-to-community mapping to ENTITY_COMMUNITY_PATH
+        """
+        graph_for_leiden = self._build_graph()
+
+        leiden = graph_for_leiden.community_leiden(weights=self.edge_weights)
         mem_vector = leiden.membership
 
         entity_to_community_map = {}
@@ -91,6 +124,9 @@ class CommunityDetector:
 
         
 def run_leiden_command():
+    """
+    CLI-style helper for running Leiden community detection.
+    """
     cd = CommunityDetector()
     cd.run_leiden()
     print("Ran Leiden algorithm successfully.")

@@ -9,3 +9,4 @@
 # 5 - entity extraction - semantic chunks - entity extraction per chunk - src/graph/entity_extractor.py
 # 6 - relationship extractor - derive relationship bw entities based on co occurrence - src/graph/relationship_Extractor.py
 # 7 - graph build - build graph from entity relations extracted - src/graph/graph_builder.py
+# 8 - community detection - run leiden algorithm for community detection on knowledge graph - src/graph/community_detector.py
