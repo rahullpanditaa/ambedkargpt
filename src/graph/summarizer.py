@@ -160,8 +160,8 @@ Write the summary below:
 """
         selected_chunks_per_community = self.select_representative_chunks()
         summaries = []
-        MAX_COMMUNITIES = 40
-        for community_id, selected_chunks in selected_chunks_per_community[:MAX_COMMUNITIES]:
+        # MAX_COMMUNITIES = 40
+        for community_id, selected_chunks in selected_chunks_per_community:
             if not selected_chunks:
                 continue
             # adding minimum filter to reduce number of communities
