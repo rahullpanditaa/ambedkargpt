@@ -99,12 +99,57 @@ class LocalGraphRAG:
             ]
 
             expanded_query_entities.sort(key=lambda d: d["score"], reverse=True)
-            
+            return expanded_query_entities
     
 
     
     def _expand_recall_via_graph_neighbours(self):
         ... 
+
+    def _chunk_entity_similarity(self):
+        retrieved_entities = self._retrieve_entitities()
+
+        # only keep entities with score above certain threshold
+        active_entities = []
+        for entity_score in retrieved_entities:
+            if entity_score["score"] > 0.6:
+                active_entities.append(entity_score["entity"])
+
+        # need entity -> chunk ids mapping
+        with open(CHUNK_ENTITIES_PATH, "r") as f:
+            # list[dict], where dict keys -> chunk_id, entities: list[dict - text_norm]
+            chunk_entities: list[dict] = json.load(f)["chunk_entities"]
+        entity_to_chunk_ids_map = {}
+        for chunk in chunk_entities:
+            # current_chunk_entities = []
+            for entity in chunk["entities"]:
+                entity_text = entity["text_norm"]
+                if entity_text not in entity_to_chunk_ids_map:
+                    entity_to_chunk_ids_map[entity_text] = []
+                entity_to_chunk_ids_map[entity_text].append(chunk["chunk_id"])
+            
+        # also need the chunk text itself
+        with open(PROCESSED_DATA_DIR_PATH / "chunks.json", "r") as f:
+            # list[dict] where dict keys - chunk_id, text , ...
+            chunks = json.load(f)["chunks"]
+
+        canditate_chunk_ids = set()
+        for active_entity in active_entities:
+            if active_entity in entity_to_chunk_ids_map:
+                canditate_chunk_ids.add(*entity_to_chunk_ids_map[active_entity])
+
+        candidate_chunks = []
+        for chunk in chunks:
+            if chunk["chunk_id"] in canditate_chunk_ids:
+                candidate_chunks.append({
+                    "chunk_id": chunk["chunk_id"],
+                    "chunk_text": chunk["text"]
+                })
+
+        # compute relevance score for each candidate chunk
+
+
+        
         
 
 def _cosine_similarity(vec1, vec2):
