@@ -132,9 +132,6 @@ class PDFIngestion:
 
         Side Effects:
             - Writes sentence data to BOOK_SENTENCES_PATH
-
-        Preconditions:
-            - _extract_paragraphs must be called first
         """
         paragraphs = self._extract_paragraphs()
         sentences = []
@@ -164,5 +161,5 @@ class PDFIngestion:
                 "document": "Ambedkar_book.pdf",
                 "sentences": sentences},
                 f, indent=2)
-        # self.sentences = sentences
+        
         return sentences

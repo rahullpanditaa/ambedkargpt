@@ -16,3 +16,6 @@
 # 10 - community embedding - embed community level summaries - src/retrieval/community_embeddings.py
 # 11 - local graph rag search - equation 4 of semrag paper - src/retrieval/local_search.py
 # 12 - global rag - equation 5 - src/retrieval/global_search.py
+
+
+# 13 generate answers from llm - src/llm/answer_generator
