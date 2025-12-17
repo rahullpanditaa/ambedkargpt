@@ -104,49 +104,134 @@ class LocalGraphRAG:
 
     
     def _expand_recall_via_graph_neighbours(self):
-        ... 
+            ... 
 
     def _chunk_entity_similarity(self):
+        # retrieve entities relevant to the query
         retrieved_entities = self._retrieve_entitities()
 
-        # only keep entities with score above certain threshold
         active_entities = []
+        entity_score_map = {}
+
         for entity_score in retrieved_entities:
             if entity_score["score"] > 0.6:
                 active_entities.append(entity_score["entity"])
+                entity_score_map[entity_score["entity"]] = entity_score["score"]
 
-        # need entity -> chunk ids mapping
+        if not active_entities:
+            return []
+
+        # entity -> chunk_ids map
         with open(CHUNK_ENTITIES_PATH, "r") as f:
-            # list[dict], where dict keys -> chunk_id, entities: list[dict - text_norm]
-            chunk_entities: list[dict] = json.load(f)["chunk_entities"]
+            chunk_entities = json.load(f)["chunk_entities"]
+
         entity_to_chunk_ids_map = {}
+        chunk_entity_freq_map = {}
+
         for chunk in chunk_entities:
-            # current_chunk_entities = []
+            chunk_id = chunk["chunk_id"]
+            chunk_entity_freq_map[chunk_id] = {}
+
             for entity in chunk["entities"]:
                 entity_text = entity["text_norm"]
+                count = entity.get("count", 1)
+
+                # entity -> chunks
                 if entity_text not in entity_to_chunk_ids_map:
                     entity_to_chunk_ids_map[entity_text] = []
-                entity_to_chunk_ids_map[entity_text].append(chunk["chunk_id"])
-            
-        # also need the chunk text itself
-        with open(PROCESSED_DATA_DIR_PATH / "chunks.json", "r") as f:
-            # list[dict] where dict keys - chunk_id, text , ...
-            chunks = json.load(f)["chunks"]
+                entity_to_chunk_ids_map[entity_text].append(chunk_id)
 
-        canditate_chunk_ids = set()
+                # chunk -> entity freq
+                chunk_entity_freq_map[chunk_id][entity_text] = count
+
+        # collect candidate chunk ids
+        candidate_chunk_ids = set()
+
         for active_entity in active_entities:
             if active_entity in entity_to_chunk_ids_map:
-                canditate_chunk_ids.add(*entity_to_chunk_ids_map[active_entity])
+                for cid in entity_to_chunk_ids_map[active_entity]:
+                    candidate_chunk_ids.add(cid)
 
-        candidate_chunks = []
-        for chunk in chunks:
-            if chunk["chunk_id"] in canditate_chunk_ids:
-                candidate_chunks.append({
-                    "chunk_id": chunk["chunk_id"],
-                    "chunk_text": chunk["text"]
+        if not candidate_chunk_ids:
+            return []
+
+        # load chunk texts
+        with open(PROCESSED_DATA_DIR_PATH / "chunks.json", "r") as f:
+            chunks = json.load(f)["chunks"]
+
+        chunk_id_to_text = {
+            ch["chunk_id"]: ch["text"] for ch in chunks
+        }
+
+        # 
+        scored_chunks = []
+
+        for chunk_id in candidate_chunk_ids:
+            score = 0.0
+
+            #for each active entity in this chunk
+            for entity in active_entities:
+                if entity in chunk_entity_freq_map.get(chunk_id, {}):
+                    entity_weight = entity_score_map[entity]
+                    entity_freq = chunk_entity_freq_map[chunk_id][entity]
+
+                    # contribution = entity relevance * frequency in chunk
+                    score += entity_weight * entity_freq
+
+            if score > 0:
+                scored_chunks.append({
+                    "chunk_id": chunk_id,
+                    "chunk_text": chunk_id_to_text.get(chunk_id, ""),
+                    "score": score
                 })
 
-        # compute relevance score for each candidate chunk
+        # sort by relevance
+        scored_chunks.sort(key=lambda d: d["score"], reverse=True)
+
+        return scored_chunks
+
+
+    # def _chunk_entity_similarity(self):
+    #     retrieved_entities = self._retrieve_entitities()
+
+    #     # only keep entities with score above certain threshold
+    #     active_entities = []
+    #     for entity_score in retrieved_entities:
+    #         if entity_score["score"] > 0.6:
+    #             active_entities.append(entity_score["entity"])
+
+    #     # need entity -> chunk ids mapping
+    #     with open(CHUNK_ENTITIES_PATH, "r") as f:
+    #         # list[dict], where dict keys -> chunk_id, entities: list[dict - text_norm]
+    #         chunk_entities: list[dict] = json.load(f)["chunk_entities"]
+    #     entity_to_chunk_ids_map = {}
+    #     for chunk in chunk_entities:
+    #         # current_chunk_entities = []
+    #         for entity in chunk["entities"]:
+    #             entity_text = entity["text_norm"]
+    #             if entity_text not in entity_to_chunk_ids_map:
+    #                 entity_to_chunk_ids_map[entity_text] = []
+    #             entity_to_chunk_ids_map[entity_text].append(chunk["chunk_id"])
+            
+    #     # also need the chunk text itself
+    #     with open(PROCESSED_DATA_DIR_PATH / "chunks.json", "r") as f:
+    #         # list[dict] where dict keys - chunk_id, text , ...
+    #         chunks = json.load(f)["chunks"]
+
+    #     canditate_chunk_ids = set()
+    #     for active_entity in active_entities:
+    #         if active_entity in entity_to_chunk_ids_map:
+    #             canditate_chunk_ids.add(*entity_to_chunk_ids_map[active_entity])
+
+    #     candidate_chunks = []
+    #     for chunk in chunks:
+    #         if chunk["chunk_id"] in canditate_chunk_ids:
+    #             candidate_chunks.append({
+    #                 "chunk_id": chunk["chunk_id"],
+    #                 "chunk_text": chunk["text"]
+    #             })
+
+    #     # compute relevance score for each candidate chunk
 
 
         
