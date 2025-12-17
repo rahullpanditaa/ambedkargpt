@@ -31,3 +31,31 @@ CHUNK_ENTITIES_PATH = PROCESSED_DATA_DIR_PATH / "chunk_entities.json"
 ENTITY_RELATIONS_PATH = PROCESSED_DATA_DIR_PATH / "entity_relations.json"
 KNOWLEDGE_GRAPH_PATH = PROCESSED_DATA_DIR_PATH / "knowledge_graph.pkl"
 ENTITY_COMMUNITY_PATH = PROCESSED_DATA_DIR_PATH / "entity_communities.json"
+COMMUNITY_SUMMARIES_PATH = PROCESSED_DATA_DIR_PATH / "community_summaries.json"
+
+# Community summarizer
+PROMPT = """You are an expert academic assistant.
+
+You are given a collection of text passages extracted from the same thematic community in Dr. B. R. Ambedkar’s writings.  
+All passages are related and discuss closely connected ideas.
+
+Your task is to write a concise, factual, and coherent summary of the main themes, arguments, and concepts present in these passages.
+
+Guidelines:
+- Base the summary strictly on the provided text.
+- Do NOT introduce new information, interpretations, or external knowledge.
+- Do NOT speculate or generalize beyond what is stated.
+- Maintain a neutral, academic tone.
+- Focus on explaining what the passages collectively discuss, not on listing passages.
+- The summary should be 1–3 paragraphs long.
+
+Text passages:
+----------------
+{CHUNKS_TEXT}
+----------------
+
+Write the summary below:
+"""
+MIN_ENTITIES_PER_COMMUNITY = 5
+TOKENS_PER_COMMUNITY = 2500
+MIN_CHUNKS_PER_COMMUNITY = 3
