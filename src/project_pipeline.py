@@ -11,3 +11,6 @@
 # 7 - graph build - build graph from entity relations extracted - src/graph/graph_builder.py
 # 8 - community detection - run leiden algorithm for community detection on knowledge graph - src/graph/community_detector.py
 # 9 - summarizer - generate summaries for each community - src/graph/summarizer.py
+
+# Retrieval
+# 10 - community embedding - embed community level summaries - src/retrieval/community_embeddings.py
