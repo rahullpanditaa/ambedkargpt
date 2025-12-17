@@ -1,26 +1,83 @@
-import json
-from pathlib import Path
-import spacy
+"""
+Entity extraction stage for knowledge graph construction.
 
-DATA_DIR_PATH = Path(__file__).parent.parent.parent.resolve() / "data"
-PROCESSED_DATA_DIR_PATH = DATA_DIR_PATH / "processed"
-CHUNKS_OUTPUT_PATH = PROCESSED_DATA_DIR_PATH / "chunks.json"
-CHUNK_ENTITIES_PATH = PROCESSED_DATA_DIR_PATH / "chunk_entities.json"
+This module extracts named entities from semantic chunks produced
+by the semantic chunking stage. Each chunk is processed independently
+using spaCy NER, and entities are aggregated with per-chunk frequencies.
+
+The output of this module is used as input for:
+- Knowledge graph construction
+- Local and global Graph RAG retrieval
+"""
+import json
+import spacy
+from pathlib import Path
+from src.utils.constants import (
+    PROCESSED_DATA_DIR_PATH,
+    CHUNKS_OUTPUT_PATH,
+    CHUNK_ENTITIES_PATH
+)
+
+# DATA_DIR_PATH = Path(__file__).parent.parent.parent.resolve() / "data"
+# PROCESSED_DATA_DIR_PATH = DATA_DIR_PATH / "processed"
+# CHUNKS_OUTPUT_PATH = PROCESSED_DATA_DIR_PATH / "chunks.json"
+# CHUNK_ENTITIES_PATH = PROCESSED_DATA_DIR_PATH / "chunk_entities.json"
 
 nlp = spacy.load("en_core_web_sm")
 
 class EntityExtractor:
+    """
+    Extracts named entities from semantic chunks.
+
+    For each chunk:
+    - Runs spaCy NER on the chunk text
+    - Normalizes entity surface forms
+    - Aggregates per-chunk entity frequencies
+    - Preserves both raw and normalized representations
+
+    The resulting entity lists form the basis for
+    knowledge graph nodes and entity-centric retrieval.
+    """
     def __init__(self):
+        """
+        Initialize the entity extractor.
+
+        Loads semantic chunks from disk and ensures the
+        processed data directory exists.
+        """
+        PROCESSED_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
         with open(CHUNKS_OUTPUT_PATH, "r") as f:
             chunks = json.load(f)
-        # keys - chunk id, text, ...
+        # keys - chunk id, text, ... etc.
         self.chunks: list[dict] = chunks["chunks"]
 
-    def extract_entities(self) -> list[dict]:
+    def _extract_entities(self) -> list[dict]:
+        """
+        Extract named entities from each semantic chunk.
+
+        Entity extraction is performed independently per chunk.
+        Entities are normalized (lowercased) for aggregation while
+        preserving raw surface forms and NER labels.
+
+        Returns:
+            list[dict]: List of per-chunk entity mappings with schema:
+                {
+                    "chunk_id": int,
+                    "entities": [
+                        {
+                            "text_norm": str,
+                            "text_raw": str,
+                            "label": str,
+                            "count": int
+                        },
+                        ...
+                    ]
+                }
+        """
         entities = []
         for chunk in self.chunks:
             doc = nlp(chunk["text"])
-            # current_chunk_entities = []
+            
             per_chunk_ent_freq = {}
             per_chunk_ent_metadata = {}
             for ent in doc.ents:
@@ -56,13 +113,22 @@ class EntityExtractor:
         return entities
     
     def create_chunk_entities(self):
-        entities = self.extract_entities()
+        """
+        Extract entities and persist them to disk.
+
+        Side Effects:
+            - Writes entity extraction results to CHUNK_ENTITIES_PATH
+        """
+        entities = self._extract_entities()
         PROCESSED_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
         with open(CHUNK_ENTITIES_PATH, "w") as f:
             json.dump({"chunk_entities": entities}, f, indent=2)
         
 
 def extract_entities_command():
+    """
+    CLI-style helper for running entity extraction manually.
+    """
     ee = EntityExtractor()
     ee.create_chunk_entities()
     print("Extracted entities")
