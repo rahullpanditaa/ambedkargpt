@@ -77,7 +77,7 @@ def local_search_command(query: str):
         print(f"{i}. (score={r['score']:.3f})")
         print(r["chunk_text"][:300], "\n")
 
-def global_search(query: str):
+def global_search_command(query: str):
     """
     Run Global Graph RAG search.
     """
@@ -92,7 +92,7 @@ def global_search(query: str):
         )
         print(r["chunk_text"][:300], "\n")
 
-def answer(query: str):
+def answer_command(query: str):
     """
     Run full SemRAG pipeline and generate final answer.
     """
