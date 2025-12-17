@@ -1,3 +1,14 @@
+"""
+PDF ingestion and structural preprocessing for the SemRAG pipeline.
+
+This module handles the earliest stage of the pipeline:
+- Taking raw PDF-extracted text
+- Splitting it into pages, paragraphs, and sentences
+- Persisting paragraph- and sentence-level artifacts to disk
+
+The outputs of this module serve as the canonical inputs for
+semantic chunking (Algorithm 1 in the SemRAG paper).
+"""
 import json
 import spacy
 from src.utils.constants import (
