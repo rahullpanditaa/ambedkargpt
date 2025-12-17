@@ -81,19 +81,19 @@ def local_search_command(query: str):
         print(r["chunk_text"][:300], "\n")
 
 def global_search_command(query: str):
-    """
-    Run Global Graph RAG search.
-    """
     rag = GlobalGraphRAG()
     results = rag.global_search(query)
 
-    print("\n=== Global Search Results ===")
-    for i, r in enumerate(results, 1):
-        print(
-            f"{i}. community={r['community_id']} "
-            f"final_score={r['final_score']:.3f}"
-        )
-        print(r["chunk_text"][:300], "\n")
+    print("=== Global Search Results ===")
+
+    if not results:
+        print("No relevant communities found.")
+        return
+
+    for i, res in enumerate(results, 1):
+        print(f"{i}. Community {res['community_id']} (score={res['score']:.3f})")
+        print(f"   Summary: {res['summary'][:300]}...\n")
+
 
 def answer_command(query: str):
     """
